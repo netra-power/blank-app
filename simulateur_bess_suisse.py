@@ -1,12 +1,11 @@
 # simulateur_bess_suisse.py
 # Streamlit app — Simulation revenus BESS (Suisse)
-# Version complète : profils bâtiment, PV, batterie, ENTSO-E, revenus, autarcie, NPV, etc.
+# Version finale – configurations PV/bâtiment/réseau, revenus, autarcie, Swissgrid (ENTSO-E)
 
 import os
 from datetime import datetime, timedelta
 import math
 import xml.etree.ElementTree as ET
-
 import numpy as np
 import pandas as pd
 import requests
@@ -22,16 +21,15 @@ def ensure_len(arr, n=8760):
     arr = np.asarray(arr, dtype=float)
     if len(arr) == n:
         return arr
-    if len(arr) == 8784:  # année bissextile
+    if len(arr) == 8784:
         return arr[:n]
     if len(arr) < n:
-        tail = np.full(n - len(arr), arr[-1] if len(arr) else 0.0, dtype=float)
+        tail = np.full(n - len(arr), arr[-1] if len(arr) else 0.0)
         return np.concatenate([arr, tail])
     return arr[:n]
 
 def year_hours(start_year=2024):
-    start = datetime(start_year, 1, 1, 0, 0)
-    return pd.date_range(start, periods=8760, freq="H")
+    return pd.date_range(datetime(start_year, 1, 1, 0, 0), periods=8760, freq="H")
 
 def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     rng = np.random.RandomState(seed)
@@ -40,10 +38,10 @@ def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
         daily = 0.8 + 0.4*np.sin(2*np.pi*((t%24)-7)/24)**2
         seasonal = 1.0 + 0.25*np.sin(2*np.pi*t/(24*365)-0.3)
     elif kind == "Tertiaire (bureaux)":
-        daily = 0.6 + 0.7*((t%24)>=7) * ((t%24)<=18)
+        daily = 0.6 + 0.7*((t%24)>=7)*((t%24)<=18)
         seasonal = 1.0 + 0.15*np.sin(2*np.pi*t/(24*365)-0.2)
     elif kind == "Industriel léger":
-        daily = 0.9 + 0.3*((t%24)>=6) * ((t%24)<=22)
+        daily = 0.9 + 0.3*((t%24)>=6)*((t%24)<=22)
         seasonal = 1.0 + 0.10*np.sin(2*np.pi*t/(24*365)-0.1)
     else:
         daily = np.full_like(t, 1.0)
@@ -51,8 +49,7 @@ def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     noise = rng.normal(1.0, 0.05, len(t))
     prof = daily * seasonal * noise
     prof[prof < 0] = 0
-    scale = annual_kwh / prof.sum() if prof.sum() > 0 else 0.0
-    prof *= scale
+    prof *= annual_kwh / prof.sum()
     return pd.Series(prof, index=year_hours(start_year))
 
 def build_pv_profile(kWc, start_year=2024):
@@ -61,8 +58,8 @@ def build_pv_profile(kWc, start_year=2024):
     day = np.clip(np.sin(2*np.pi*((t%24)-6)/24), 0, None)
     seasonal = (np.sin(2*np.pi*t/(24*365)-0.1)+1)/2 * 0.7 + 0.3
     raw = kWc * day * seasonal
-    scale = (1000.0*kWc)/raw.sum() if raw.sum()>0 else 0.0
-    return pd.Series(raw*scale, index=idx)
+    raw *= (1000.0*kWc)/raw.sum()
+    return pd.Series(raw, index=idx)
 
 def parse_entsoe_a44(xml_text):
     root = ET.fromstring(xml_text)
@@ -72,7 +69,6 @@ def parse_entsoe_a44(xml_text):
         for period in ts.findall(".//ns:Period", ns):
             start_s = period.find("./ns:timeInterval/ns:start", ns).text
             start_dt = datetime.fromisoformat(start_s.replace("Z","+00:00")).replace(tzinfo=None)
-            step = timedelta(hours=1)
             for pt in period.findall("./ns:Point", ns):
                 pos = int(pt.find("./ns:position", ns).text)
                 val_el = pt.find("./ns:price.amount", ns)
@@ -84,8 +80,7 @@ def parse_entsoe_a44(xml_text):
                 try:
                     val = float(val_el.text)
                 except: continue
-                t = start_dt + step*(pos-1)
-                times.append(t)
+                times.append(start_dt + timedelta(hours=pos-1))
                 prices.append(val)
     if not prices:
         return None
@@ -124,14 +119,12 @@ st.caption("Devise: CHF — Profils horaires sur 1 an (8760 h)")
 
 with st.sidebar:
     st.header("Configuration")
-
     system_type = st.selectbox("Type de configuration", [
         "Batterie couplée à un bâtiment + PV",
         "Batterie couplée à un bâtiment",
         "Batterie couplée au réseau"
     ])
 
-    # Le marché libre n'est proposé que pour les bâtiments
     if "bâtiment" in system_type.lower():
         marche_libre = st.radio("Bâtiment sur le marché libre ?", ["Oui", "Non"], index=1)
     else:
@@ -140,33 +133,33 @@ with st.sidebar:
     eur_chf = st.number_input("Taux EUR→CHF", min_value=0.5, max_value=2.0, value=1.0, step=0.01)
 
     st.subheader("📊 Bâtiment — Consommation")
-    st.markdown("> ⚙️ **Format CSV attendu** : une seule colonne, 8760 valeurs horaires (kWh/h), sans en-tête.")
+    st.markdown("> ⚙️ **Format CSV attendu :** 1 colonne, 8760 valeurs horaires (kWh/h), sans en-tête.")
     cons_upload = st.file_uploader("Importer profil conso (CSV)", type=["csv"])
     if cons_upload is None:
         building_kind = st.selectbox("Profil type", ["Résidentiel", "Tertiaire (bureaux)", "Industriel léger", "Industriel lourd"])
-        annual_kwh = st.number_input("Consommation annuelle (kWh)", min_value=0.0, value=50_000, step=1_000, format="%d")
+        annual_kwh = st.number_input("Consommation annuelle (kWh)", min_value=0.0, value=50000.0, step=1000.0, format="%.0f")
 
     has_pv = "PV" in system_type
     if has_pv:
         st.subheader("☀️ Photovoltaïque")
-        pv_kwc = st.number_input("Puissance installée (kWc)", min_value=0.0, value=100.0, step=1.0, format="%d")
-        pv_kva = st.number_input("Puissance apparente (kVA)", min_value=0.0, value=100.0, step=1.0, format="%d")
+        pv_kwc = st.number_input("Puissance installée (kWc)", min_value=0.0, value=100.0, step=1.0, format="%.0f")
+        pv_kva = st.number_input("Puissance apparente (kVA)", min_value=0.0, value=100.0, step=1.0, format="%.0f")
         pv_upload = st.file_uploader("Importer profil PV (CSV)", type=["csv"])
-        pv_total_kwh = st.number_input("Production annuelle estimée (kWh)", min_value=0.0, value=100_000.0, step=1_000.0, format="%d")
+        pv_total_kwh = st.number_input("Production annuelle estimée (kWh)", min_value=0.0, value=100000.0, step=1000.0, format="%.0f")
     else:
         pv_kwc = pv_kva = pv_total_kwh = 0.0
         pv_upload = None
 
     st.subheader("🔋 Batterie")
-    batt_kwh = st.number_input("Capacité (kWh)", min_value=0.0, value=200.0, step=10.0, format="%d")
-    batt_kw = st.number_input("Puissance (kW)", min_value=0.0, value=100.0, step=10.0, format="%d")
-    eff_rt = st.number_input("Rendement (%)", min_value=50, max_value=100, value=90, step=1, format="%d") / 100
-    dod = st.number_input("Profondeur de décharge (%)", min_value=10, max_value=100, value=90, step=1, format="%d") / 100
+    batt_kwh = st.number_input("Capacité (kWh)", min_value=0.0, value=200.0, step=10.0, format="%.0f")
+    batt_kw = st.number_input("Puissance (kW)", min_value=0.0, value=100.0, step=10.0, format="%.0f")
+    eff_rt = st.number_input("Rendement (%)", min_value=50.0, max_value=100.0, value=90.0, step=1.0, format="%.0f") / 100
+    dod = st.number_input("Profondeur de décharge (%)", min_value=10.0, max_value=100.0, value=90.0, step=1.0, format="%.0f") / 100
 
     st.subheader("💰 Paramètres économiques")
-    capex_pv_per_kwc = st.number_input("CAPEX PV (CHF/kWc)", min_value=0.0, value=900.0, step=10.0, format="%d")
-    capex_batt_per_kwh = st.number_input("CAPEX Batterie (CHF/kWh)", min_value=0.0, value=350.0, step=10.0, format="%d")
-    years = st.number_input("Durée de simulation (ans)", min_value=1, max_value=30, value=10, step=1)
+    capex_pv_per_kwc = st.number_input("CAPEX PV (CHF/kWc)", min_value=0.0, value=900.0, step=10.0, format="%.0f")
+    capex_batt_per_kwh = st.number_input("CAPEX Batterie (CHF/kWh)", min_value=0.0, value=350.0, step=10.0, format="%.0f")
+    years = st.number_input("Durée de simulation (ans)", min_value=1.0, max_value=30.0, value=10.0, step=1.0, format="%.0f")
     disc = st.number_input("Taux d'actualisation (%)", min_value=0.0, max_value=20.0, value=5.0, step=0.1) / 100
 
     st.subheader("🔌 Tarification & services")
@@ -175,9 +168,9 @@ with st.sidebar:
         price_sell_fixed = st.number_input("Tarif revente PV (CHF/kWh)", min_value=0.0, value=0.08, step=0.01)
     else:
         price_buy_fixed = price_sell_fixed = None
-    peak_tariff = st.number_input("Tarif puissance (CHF/kW/an)", min_value=0.0, value=150.0, step=5.0, format="%d")
-    services_kw = st.number_input("Puissance contractée (kW)", min_value=0.0, value=0.0, step=10.0, format="%d")
-    services_tariff = st.number_input("Rémunération services (CHF/kW/an)", min_value=0.0, value=40.0, step=1.0, format="%d")
+    peak_tariff = st.number_input("Tarif puissance (CHF/kW/an)", min_value=0.0, value=150.0, step=5.0, format="%.0f")
+    services_kw = st.number_input("Puissance contractée (kW)", min_value=0.0, value=0.0, step=10.0, format="%.0f")
+    services_tariff = st.number_input("Rémunération services (CHF/kW/an)", min_value=0.0, value=40.0, step=1.0, format="%.0f")
 
 # -----------------------------
 # Profils
@@ -285,7 +278,7 @@ total_rev = sum(revenus.values())
 capex_total = pv_kwc * capex_pv_per_kwc + batt_kwh * capex_batt_per_kwh
 
 # -----------------------------
-# Affichage des résultats
+# Résultats
 # -----------------------------
 st.subheader("📊 Résultats")
 c1, c2, c3 = st.columns(3)
@@ -323,5 +316,7 @@ ax[2].legend()
 
 st.pyplot(fig)
 
-st.caption("Remarques : Les prix ENTSO-E (Swissgrid) sont utilisés si la clé API est fournie. "
-           "Les fichiers CSV doivent contenir 8760 valeurs horaires (kWh/h) sans en-tête.")
+st.caption(
+    "Remarques : Les prix ENTSO-E (Swissgrid) sont utilisés si la clé API est fournie. "
+    "Les fichiers CSV doivent contenir 8760 valeurs horaires (kWh/h) sans en-tête."
+)
