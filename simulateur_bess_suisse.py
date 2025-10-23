@@ -1,6 +1,7 @@
 # simulateur_bess_suisse.py
 # Streamlit app — Simulation revenus BESS (Suisse)
-# Version finale – configurations PV/bâtiment/réseau, revenus, autarcie, Swissgrid (ENTSO-E)
+# Version finale – configurations PV/bâtiment/réseau, revenus, PV split, sources d'énergie, profils été/hiver,
+# Swissgrid (ENTSO-E), peak shaving annuel (si marché libre), cashflow cumulé
 
 import os
 from datetime import datetime, timedelta
@@ -125,6 +126,7 @@ with st.sidebar:
         "Batterie couplée au réseau"
     ])
 
+    # Le marché libre s'applique uniquement s'il y a un bâtiment
     if "bâtiment" in system_type.lower():
         marche_libre = st.radio("Bâtiment sur le marché libre ?", ["Oui", "Non"], index=1)
     else:
@@ -133,7 +135,7 @@ with st.sidebar:
     eur_chf = st.number_input("Taux EUR→CHF", min_value=0.5, max_value=2.0, value=1.0, step=0.01)
 
     st.subheader("📊 Bâtiment — Consommation")
-    st.markdown("> ⚙️ **Format CSV attendu :** 1 colonne, 8760 valeurs horaires (kWh/h), sans en-tête.")
+    st.markdown("> ⚙️ **Format CSV attendu :** 1 colonne, 8760 valeurs horaires (kWh/h), sans en-tête (séparateur ',' ou ';').")
     cons_upload = st.file_uploader("Importer profil conso (CSV)", type=["csv"])
     if cons_upload is None:
         building_kind = st.selectbox("Profil type", ["Résidentiel", "Tertiaire (bureaux)", "Industriel léger", "Industriel lourd"])
@@ -144,6 +146,7 @@ with st.sidebar:
         st.subheader("☀️ Photovoltaïque")
         pv_kwc = st.number_input("Puissance installée (kWc)", min_value=0.0, value=100.0, step=1.0, format="%.0f")
         pv_kva = st.number_input("Puissance apparente (kVA)", min_value=0.0, value=100.0, step=1.0, format="%.0f")
+        st.markdown("> ⚙️ **Format CSV PV attendu :** 1 colonne, 8760 valeurs horaires (kWh/h), sans en-tête.")
         pv_upload = st.file_uploader("Importer profil PV (CSV)", type=["csv"])
         pv_total_kwh = st.number_input("Production annuelle estimée (kWh)", min_value=0.0, value=100000.0, step=1000.0, format="%.0f")
     else:
@@ -173,11 +176,11 @@ with st.sidebar:
     services_tariff = st.number_input("Rémunération services (CHF/kW/an)", min_value=0.0, value=40.0, step=1.0, format="%.0f")
 
 # -----------------------------
-# Profils
+# Profils (conso & PV)
 # -----------------------------
 idx = year_hours(2024)
 if cons_upload:
-    cons_df = pd.read_csv(cons_upload, header=None)
+    cons_df = pd.read_csv(cons_upload, header=None, sep=None, engine="python")
     load = ensure_len(cons_df.iloc[:, 0].values, 8760)
     load = pd.Series(load, index=idx)
 else:
@@ -185,7 +188,7 @@ else:
 
 if has_pv:
     if pv_upload:
-        pv_df = pd.read_csv(pv_upload, header=None)
+        pv_df = pd.read_csv(pv_upload, header=None, sep=None, engine="python")
         pv = ensure_len(pv_df.iloc[:, 0].values, 8760)
         pv = pd.Series(pv, index=idx)
     else:
@@ -212,46 +215,96 @@ else:
     prices = pd.Series(np.full(8760, price_buy_fixed), index=idx)
 
 # -----------------------------
-# Simulation
+# Simulation + dispatch (sépare charge PV vs réseau)
 # -----------------------------
 def simulate_dispatch(load, pv, prices, cap_kwh, p_kw, eff_rt, dod, market_free):
+    n = len(load)
     soc = 0.5 * cap_kwh
     soc_min, soc_max = (1-dod)*cap_kwh, cap_kwh
-    charged, discharged, rev_auto, rev_arb = np.zeros(8760), np.zeros(8760), np.zeros(8760), np.zeros(8760)
+
+    charged = np.zeros(n)
+    discharged = np.zeros(n)
+    charged_from_pv = np.zeros(n)
+    charged_from_grid = np.zeros(n)
+
+    rev_auto = np.zeros(n)  # valeur de décharge pour couvrir le load (évite achat)
+    rev_arb = np.zeros(n)   # valeur arbitrage prix
 
     if market_free:
         low, high = np.quantile(prices, [0.25, 0.75])
     else:
         low = high = None
 
-    for i in range(8760):
+    for i in range(n):
         pv_h, load_h, price = pv[i], load[i], prices[i]
-        net = load_h - pv_h
-        if net < 0:
-            charge = min(-net, p_kw, soc_max - soc)
-            soc += charge * eff_rt
-            charged[i] = charge
-        else:
-            discharge = min(net, p_kw, soc - soc_min)
-            soc -= discharge
-            discharged[i] = discharge * eff_rt
-            rev_auto[i] = discharge * price
+        net = load_h - pv_h   # >0 déficit, <0 surplus PV
 
+        # 1) Consommation PV directe et charge batterie depuis PV (si surplus)
+        if net < -1e-12:
+            surplus = -net
+            charge_pv = min(surplus, p_kw, soc_max - soc)
+            soc += charge_pv * eff_rt
+            charged[i] += charge_pv
+            charged_from_pv[i] += charge_pv
+            # surplus PV restant => export (géré plus tard)
+        else:
+            # 2) Si déficit, décharger batterie pour remplacer achat réseau
+            deficit = net
+            if deficit > 1e-12:
+                discharge = min(deficit, p_kw, soc - soc_min)
+                delivered = discharge * eff_rt
+                soc -= discharge
+                discharged[i] += delivered
+                rev_auto[i] = delivered * price
+
+        # 3) Arbitrage marché libre: charge réseau à bas prix / décharge à haut prix
         if market_free:
             if price <= low and soc < soc_max:
-                soc += min(p_kw, soc_max - soc) * eff_rt
-            elif price >= high and soc > soc_min:
-                discharged[i] += min(p_kw, soc - soc_min) * eff_rt
-                soc -= min(p_kw, soc - soc_min)
-                rev_arb[i] = (price - low) * discharged[i]
+                grid_charge = min(p_kw, soc_max - soc)
+                soc += grid_charge * eff_rt
+                charged[i] += grid_charge
+                charged_from_grid[i] += grid_charge
 
-    return charged, discharged, rev_auto.sum(), rev_arb.sum()
+            if price >= high and soc > soc_min:
+                grid_discharge = min(p_kw, soc - soc_min)
+                delivered = grid_discharge * eff_rt
+                soc -= grid_discharge
+                discharged[i] += delivered
+                rev_arb[i] = max(0.0, price - low) * delivered
 
-charged, discharged, rev_auto, rev_arb = simulate_dispatch(load, pv, prices, batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui")
+        soc = min(max(soc, soc_min), soc_max)
 
-pv_self = np.minimum(pv, load)
-pv_export = np.maximum(0.0, pv - pv_self - charged)
-autarky = 1 - ((load - pv_self - discharged + charged).clip(lower=0).sum() / load.sum())
+    # Net pour peak shaving (inclut charge/décharge batterie)
+    net_before = (load - pv).clip(lower=0)
+    net_after = (load - pv - discharged + charged).clip(lower=0)
+
+    return (
+        charged, discharged, charged_from_pv, charged_from_grid,
+        rev_auto.sum(), rev_arb.sum(),
+        net_before, net_after
+    )
+
+charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_before, net_after = simulate_dispatch(
+    load, pv, prices, batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
+)
+
+# -----------------------------
+# PV split & sources d'énergie du bâtiment
+# -----------------------------
+pv_self_no_bess = np.minimum(pv, load)                  # sans batterie
+grid_to_load_no_bess = (load - pv_self_no_bess).clip(lower=0)
+
+pv_self = np.minimum(pv, load)                          # avec batterie (direct PV → charge)
+pv_to_batt = charged_from_pv.clip(min=0)
+pv_export = np.maximum(0.0, pv - pv_self - pv_to_batt)
+
+# Sources vers la charge du bâtiment (pas les charges batterie)
+bess_to_load = discharged                               # batterie → charge du bâtiment
+grid_to_load = (load - pv_self - bess_to_load).clip(lower=0)
+
+# Autoconsommation bâtiment (taux)
+autoconso_no_bess = (pv_self_no_bess.sum()/pv.sum()*100) if pv.sum()>0 else 0.0
+autoconso_with_bess = ((pv_self.sum()+pv_to_batt.sum())/pv.sum()*100) if pv.sum()>0 else 0.0
 
 # -----------------------------
 # Revenus
@@ -263,7 +316,7 @@ else:
     rev_pv_auto = (pv_self * prices).sum()
     rev_pv_export = (pv_export * prices).sum()
 
-rev_peak = (np.max(load - pv) - np.max(load - pv - discharged + charged)) * peak_tariff
+rev_peak = (net_before.max() - net_after.max()) * peak_tariff
 rev_services = services_kw * services_tariff
 
 revenus = {
@@ -277,46 +330,139 @@ revenus = {
 total_rev = sum(revenus.values())
 capex_total = pv_kwc * capex_pv_per_kwc + batt_kwh * capex_batt_per_kwh
 
+# Cashflow cumulé actualisé (année 0 = -CAPEX, années 1..N = total_rev)
+years_int = int(round(years))
+cashflows = [-capex_total] + [total_rev]*(years_int)
+cum_discounted = []
+acc = 0.0
+for i, cf in enumerate(cashflows):
+    acc += cf / ((1+disc)**i)
+    cum_discounted.append(acc)
+cum_years = list(range(0, years_int+1))
+
 # -----------------------------
-# Résultats
+# Résultats — affichage
 # -----------------------------
 st.subheader("📊 Résultats")
-c1, c2, c3 = st.columns(3)
+
+# En-tête : on enlève l'autarcie comme demandé
+c1, c2 = st.columns(2)
 c1.metric("Revenu annuel total", f"{total_rev:,.0f} CHF")
-c2.metric("Autarcie du bâtiment", f"{autarky*100:.0f} %")
-c3.metric("CAPEX total", f"{capex_total:,.0f} CHF")
+c2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
 
 st.markdown("### 💰 Détail des revenus (CHF/an)")
 rev_df = pd.DataFrame(revenus.items(), columns=["Source", "CHF/an"])
 st.dataframe(rev_df.style.format({"CHF/an": "{:,.0f}"}))
 
-if has_pv:
-    st.markdown("### ☀️ PV — Indicateurs")
-    pv_df = pd.DataFrame({
-        "Production totale (kWh)": [pv.sum()],
-        "Autoconsommation (kWh)": [pv_self.sum()],
-        "Export (kWh)": [pv_export.sum()],
-        "Taux d'autoconsommation (%)": [100 * pv_self.sum() / pv.sum() if pv.sum() > 0 else 0]
+# --- Panneau PV : camembert PV split + autoconso sans/avec BESS
+st.markdown("### ☀️ PV — Répartition & Autoconsommation")
+col_pv1, col_pv2 = st.columns([1.2, 1.0])
+
+with col_pv1:
+    fig, ax = plt.subplots(figsize=(5,5))
+    labels = ["Autoconsommation directe", "Vers batterie", "Export"]
+    sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
+    if sum(sizes) <= 0: sizes = [1,0,0]
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90)
+    ax.set_title("Répartition de la production PV")
+    st.pyplot(fig)
+
+with col_pv2:
+    st.write("**Autoconsommation du bâtiment**")
+    ac_df = pd.DataFrame({
+        "Scénario": ["PV sans BESS", "PV avec BESS"],
+        "Autoconsommation (%)": [autoconso_no_bess, autoconso_with_bess]
     })
-    st.dataframe(pv_df.style.format("{:,.0f}"))
+    st.dataframe(ac_df.style.format({"Autoconsommation (%)": "{:,.0f}"}))
 
-st.markdown("### 📈 Profils (1ère semaine)")
-fig, ax = plt.subplots(3, 1, figsize=(10, 8), sharex=True)
-sample = slice(0, 168)
-ax[0].plot(load.index[sample], load[sample], label="Conso (kWh)")
-ax[0].plot(pv.index[sample], pv[sample], label="PV (kWh)")
-ax[0].legend()
+# --- Panneau "Sources d'énergie du bâtiment" : sans/avec BESS (deux camemberts)
+st.markdown("### 🏢 Sources d'énergie du bâtiment")
+col_src1, col_src2 = st.columns(2)
+with col_src1:
+    fig, ax = plt.subplots(figsize=(5,5))
+    labels = ["PV direct", "BESS", "Réseau"]
+    sizes = [pv_self_no_bess.sum(), 0.0, grid_to_load_no_bess.sum()]
+    if sum(sizes) <= 0: sizes = [1,0,0]
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90)
+    ax.set_title("Sans batterie")
+    st.pyplot(fig)
 
-ax[1].plot(load.index[sample], discharged[sample], label="Décharge (kWh)")
-ax[1].plot(load.index[sample], charged[sample], label="Charge (kWh)")
-ax[1].legend()
+with col_src2:
+    fig, ax = plt.subplots(figsize=(5,5))
+    labels = ["PV direct", "BESS", "Réseau"]
+    sizes = [pv_self.sum(), bess_to_load.sum(), grid_to_load.sum()]
+    if sum(sizes) <= 0: sizes = [1,0,0]
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90)
+    ax.set_title("Avec batterie")
+    st.pyplot(fig)
 
-ax[2].plot(load.index[sample], prices[sample], color="orange", label="Prix (CHF/kWh)")
-ax[2].legend()
+# --- Profils (été / hiver) : seulement pertinent si PV + BESS + bâtiment
+if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_kw > 0):
+    st.markdown("### 📈 Profils — Journées type été / hiver")
 
+    def day_slice(date_str):
+        d0 = pd.Timestamp(date_str)
+        mask = (idx >= d0) & (idx < d0 + pd.Timedelta(days=1))
+        return mask
+
+    # Choix des journées type
+    mask_summer = day_slice("2024-07-15")
+    mask_winter = day_slice("2024-01-15")
+
+    for label, mask in [("Été (15 juillet)", mask_summer), ("Hiver (15 janvier)", mask_winter)]:
+        lday = load[mask].values
+        pvday = pv[mask].values
+        tday = load[mask].index
+
+        # Conso + PV + hachures autoconsommation
+        fig, ax = plt.subplots(figsize=(10,3))
+        ax.plot(tday, lday, label="Consommation bâtiment (kWh/h)")
+        ax.plot(tday, pvday, label="Production PV (kWh/h)")
+        auto_day = np.minimum(lday, pvday)
+        ax.fill_between(tday, 0, auto_day, hatch='//', alpha=0.3, label="Autoconsommation (hachuré)")
+        ax.set_title(f"Conso vs PV — {label}")
+        ax.legend()
+        st.pyplot(fig)
+
+        # Charge / décharge batterie sur la journée
+        ch_day = charged[mask].values
+        dis_day = discharged[mask].values
+        fig2, ax2 = plt.subplots(figsize=(10,3))
+        ax2.bar(tday, ch_day, width=0.03, label="Charge (kWh/h)")
+        ax2.bar(tday, dis_day, width=0.03, label="Décharge (kWh/h)")
+        ax2.set_title(f"Flux batterie — {label}")
+        ax2.legend()
+        st.pyplot(fig2)
+
+# --- Peak shaving annuel (si marché libre)
+if ("bâtiment" in system_type.lower()) and (marche_libre == "Oui"):
+    st.markdown("### 🏔️ Peak shaving sur l'année (pics mensuels)")
+    month_index = pd.Index(idx).month
+    before_monthly_peak = pd.Series(net_before.values, index=idx).groupby(month_index).max()
+    after_monthly_peak = pd.Series(net_after.values, index=idx).groupby(month_index).max()
+
+    fig, ax = plt.subplots(figsize=(10,4))
+    ax.bar(before_monthly_peak.index-0.15, before_monthly_peak.values, width=0.3, label="Avant BESS")
+    ax.bar(after_monthly_peak.index+0.15, after_monthly_peak.values, width=0.3, label="Après BESS")
+    ax.set_xlabel("Mois")
+    ax.set_ylabel("kW")
+    ax.set_xticks(range(1,13))
+    ax.set_title("Pics mensuels de puissance (avant/après)")
+    ax.legend()
+    st.pyplot(fig)
+
+# --- Cashflow cumulé (actualisé)
+st.markdown("### 💵 Cashflow cumulé (actualisé)")
+fig, ax = plt.subplots(figsize=(10,3))
+ax.plot(cum_years, cum_discounted, marker="o")
+ax.axhline(0, color="gray", linewidth=1)
+ax.set_xlabel("Années")
+ax.set_ylabel("CHF (actualisés)")
+ax.set_title("Évolution du cashflow cumulé (CAPEX + revenus)")
 st.pyplot(fig)
 
 st.caption(
     "Remarques : Les prix ENTSO-E (Swissgrid) sont utilisés si la clé API est fournie. "
-    "Les fichiers CSV doivent contenir 8760 valeurs horaires (kWh/h) sans en-tête."
+    "Les fichiers CSV doivent contenir 8760 valeurs horaires (kWh/h) sans en-tête. "
+    "Les parts d'énergie 'vers batterie' distinguent PV→batterie et réseau→batterie."
 )
