@@ -3,6 +3,19 @@ import pandas as pd
 import numpy as np
 import datetime as dt
 
+# --- Lecture sécurisée de la clé ENTSO-E ---
+if "ENTSOE_API_KEY" in st.secrets:
+    ENTSOE_API_KEY = st.secrets["ENTSOE_API_KEY"]
+elif os.getenv("ENTSOE_API_KEY"):
+    ENTSOE_API_KEY = os.getenv("ENTSOE_API_KEY")
+else:
+    ENTSOE_API_KEY = None
+
+if not ENTSOE_API_KEY:
+    st.warning("⚠️ Clé ENTSO-E manquante. Les données réelles ne seront pas chargées.")
+else:
+    st.success("✅ Clé ENTSO-E détectée avec succès !")
+
 st.set_page_config(page_title="Simulateur Revenus BESS Suisse", layout="wide")
 
 st.title("🔋 Simulateur de revenus pour systèmes de stockage en Suisse")
