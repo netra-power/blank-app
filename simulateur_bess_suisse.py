@@ -1,9 +1,18 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-import datetime as dt
+import requests
+from datetime import datetime, timedelta
+import plotly.express as px
+import os
 
-# --- Lecture sécurisée de la clé ENTSO-E ---
+st.set_page_config(page_title="Simulateur BESS Suisse", layout="wide")
+
+st.title("🔋 Simulateur de revenus pour systèmes de stockage en Suisse")
+
+# -----------------------------------------------------------
+# 1️⃣ Lecture sécurisée de la clé ENTSO-E
+# -----------------------------------------------------------
 if "ENTSOE_API_KEY" in st.secrets:
     ENTSOE_API_KEY = st.secrets["ENTSOE_API_KEY"]
 elif os.getenv("ENTSOE_API_KEY"):
@@ -11,86 +20,148 @@ elif os.getenv("ENTSOE_API_KEY"):
 else:
     ENTSOE_API_KEY = None
 
-if not ENTSOE_API_KEY:
-    st.warning("⚠️ Clé ENTSO-E manquante. Les données réelles ne seront pas chargées.")
+if ENTSOE_API_KEY:
+    st.success("✅ Clé ENTSO-E détectée avec succès.")
 else:
-    st.success("✅ Clé ENTSO-E détectée avec succès !")
+    st.warning("⚠️ Clé ENTSO-E manquante. Les données réelles ne seront pas chargées.")
 
-st.set_page_config(page_title="Simulateur Revenus BESS Suisse", layout="wide")
 
-st.title("🔋 Simulateur de revenus pour systèmes de stockage en Suisse")
+# -----------------------------------------------------------
+# 2️⃣ Fonction : récupération des prix réels ENTSO-E (Swissgrid)
+# -----------------------------------------------------------
+@st.cache_data(show_spinner=True)
+def get_entsoe_prices(api_key, country_code="10YCH-SWISSGRIDZ", days=7):
+    """
+    Récupère les prix day-ahead Swissgrid depuis ENTSO-E (A44)
+    Retourne un DataFrame avec les prix horaires en EUR/kWh.
+    """
+    try:
+        end = datetime.utcnow()
+        start = end - timedelta(days=days)
+        url = (
+            f"https://web-api.tp.entsoe.eu/api?securityToken={api_key}"
+            f"&documentType=A44"
+            f"&in_Domain={country_code}"
+            f"&out_Domain={country_code}"
+            f"&periodStart={start.strftime('%Y%m%d%H%M')}"
+            f"&periodEnd={end.strftime('%Y%m%d%H%M')}"
+        )
 
-st.sidebar.header("⚙️ Paramètres du système")
+        r = requests.get(url)
+        if r.status_code != 200:
+            raise Exception(f"Erreur {r.status_code}: {r.text}")
 
-# --- Configuration générale ---
-type_systeme = st.sidebar.selectbox(
-    "Type de système", 
-    [
-        "Batterie couplée à une installation PV sur bâtiment",
-        "Batterie sur bâtiment sans PV",
-        "Batterie raccordée directement au réseau"
-    ]
-)
+        df = pd.read_xml(r.text)
+        df = df[df["price.amount"].notnull()][["position", "price.amount"]].rename(
+            columns={"price.amount": "EUR_MWh"}
+        )
+        df["EUR_kWh"] = df["EUR_MWh"] / 1000
+        df["datetime"] = pd.date_range(start=start, periods=len(df), freq="H")
+        return df
 
-# --- Caractéristiques techniques ---
-st.sidebar.subheader("Paramètres techniques de la batterie")
-cap_batt = st.sidebar.number_input("Capacité batterie (kWh)", 100, 5000, 1000, 100)
-p_batt = st.sidebar.number_input("Puissance batterie (kW)", 50, 2000, 500, 50)
-rendement = st.sidebar.slider("Rendement global (%)", 70, 100, 90)
-dod = st.sidebar.slider("Profondeur de décharge (DoD %)", 50, 100, 90)
+    except Exception as e:
+        st.warning(f"⚠️ Erreur de récupération ENTSO-E : {e}")
+        return None
 
-# --- Paramètres financiers ---
-st.sidebar.subheader("Paramètres financiers")
-capex = st.sidebar.number_input("CAPEX (CHF/kWh)", 200, 1000, 400, 10)
-opex = st.sidebar.number_input("OPEX annuel (% du CAPEX)", 0, 10, 2, 1)
-taux_actualisation = st.sidebar.slider("Taux d'actualisation (%)", 0.0, 15.0, 5.0, 0.1)
-duree_proj = st.sidebar.number_input("Durée du projet (années)", 1, 25, 10)
 
-# --- Simulation simple de profils horaires ---
-st.subheader("📊 Simulation annuelle simplifiée")
-
-heures = pd.date_range("2024-01-01", "2024-12-31 23:00", freq="H")
-prix = 0.1 + 0.05*np.sin(np.linspace(0, 20*np.pi, len(heures)))  # prix simulé CHF/kWh
-charge = 50 + 30*np.sin(np.linspace(0, 10*np.pi, len(heures)))   # consommation simulée
-prod_pv = np.zeros(len(heures))
-if "PV" in type_systeme:
-    prod_pv = np.maximum(0, 80*np.sin(np.linspace(0, 365*np.pi, len(heures))))
-
-df = pd.DataFrame({
-    "Heure": heures,
-    "Prix (CHF/kWh)": prix,
-    "Conso (kWh)": charge,
-    "Prod_PV (kWh)": prod_pv
-})
-
-# --- Revenus simulés (simplifiés pour test) ---
-revenu_autoconso = np.sum(np.minimum(prod_pv, charge) * 0.25) if "PV" in type_systeme else 0
-revenu_arbitrage = np.std(prix) * cap_batt * 0.1
-revenu_peak = np.max(charge) * 0.01 * 12
-revenu_services = p_batt * 10
-
-revenu_total = revenu_autoconso + revenu_arbitrage + revenu_peak + revenu_services
-invest_initial = cap_batt * capex
-opex_annuel = invest_initial * opex / 100
-flux = [-(invest_initial)] + [(revenu_total - opex_annuel)/(1+taux_actualisation/100)**i for i in range(1, duree_proj+1)]
-roi = (sum(flux) + invest_initial) / invest_initial * 100
-
-# --- Affichage résultats ---
-st.metric("💰 Revenu annuel total (CHF)", f"{revenu_total:,.0f}")
-st.metric("📈 ROI global (%)", f"{roi:.1f}")
+# -----------------------------------------------------------
+# 3️⃣ Interface utilisateur
+# -----------------------------------------------------------
 
 col1, col2 = st.columns(2)
+
 with col1:
-    st.write("### Détails des revenus (CHF/an)")
-    st.bar_chart({
-        "Optimisation autoconsommation": [revenu_autoconso],
-        "Arbitrage": [revenu_arbitrage],
-        "Peak shaving": [revenu_peak],
-        "Services système": [revenu_services]
-    })
+    system_type = st.selectbox(
+        "Type de système de stockage",
+        [
+            "Batterie couplée à une installation PV et raccordée à un bâtiment",
+            "Batterie raccordée à un bâtiment (sans PV)",
+            "Batterie raccordée directement au réseau (BT ou MT)",
+        ],
+    )
+
+    bat_puissance = st.number_input("Puissance batterie (kW)", 10, 5000, 100)
+    bat_capacite = st.number_input("Capacité batterie (kWh)", 10, 20000, 200)
+    rendement = st.slider("Rendement global du système (%)", 70, 98, 90)
+    profondeur = st.slider("Profondeur de décharge (%)", 50, 100, 90)
+    duree = st.number_input("Durée de simulation (années)", 1, 25, 10)
+    taux_actualisation = st.number_input("Taux d'actualisation (%)", 0.0, 15.0, 5.0)
 
 with col2:
-    st.write("### Profil horaire simulé")
-    st.line_chart(df[["Conso (kWh)", "Prod_PV (kWh)"]])
+    capex = st.number_input("CAPEX (CHF/kWh)", 100, 2000, 600)
+    opex = st.number_input("OPEX annuel (% CAPEX)", 0.0, 10.0, 2.0)
+    marche_libre = st.radio("Bâtiment sur le marché libre ?", ["Oui", "Non"])
+    tarif_achat = st.number_input("Tarif d'achat (CHF/kWh)", 0.0, 1.0, 0.18)
+    tarif_revente = st.number_input("Tarif de revente du surplus PV (CHF/kWh)", 0.0, 1.0, 0.08)
 
-st.success("Simulation réalisée avec succès. Une fois la clé ENTSO-E obtenue, les données réelles remplaceront les profils simulés.")
+    if "PV" in system_type:
+        pv_puissance = st.number_input("Puissance PV installée (kWc)", 1, 5000, 100)
+    else:
+        pv_puissance = 0
+
+st.divider()
+
+# -----------------------------------------------------------
+# 4️⃣ Chargement des prix réels
+# -----------------------------------------------------------
+if ENTSOE_API_KEY:
+    st.info("Téléchargement des prix Swissgrid en cours...")
+    price_data = get_entsoe_prices(ENTSOE_API_KEY, days=7)
+    if price_data is not None:
+        st.success("✅ Données Swissgrid chargées avec succès.")
+        fig = px.line(price_data, x="datetime", y="EUR_kWh", title="Prix horaires ENTSO-E (Swissgrid)")
+        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.warning("⚠️ Données réelles indisponibles, utilisation d’un profil simulé.")
+else:
+    price_data = None
+    st.warning("⚠️ Pas de clé API détectée — utilisation de données simulées.")
+
+
+# -----------------------------------------------------------
+# 5️⃣ Simulation économique simplifiée
+# -----------------------------------------------------------
+st.header("📈 Résultats de la simulation")
+
+heures = 8760
+if price_data is not None:
+    prix = price_data["EUR_kWh"].mean() * 0.95  # CHF/kWh approximé
+else:
+    prix = 0.15  # CHF/kWh simulé
+
+revenu_autoconso = (
+    pv_puissance * 1000 * 1100 * 0.3 * tarif_achat / 1000
+    if "PV" in system_type
+    else 0
+)
+revenu_arbitrage = bat_puissance * 8760 * 0.05 * (prix * 0.1)
+revenu_services = bat_puissance * 100 * 0.2
+revenu_peak = bat_puissance * 50 * 0.3
+
+revenu_total = (
+    revenu_autoconso + revenu_arbitrage + revenu_services + revenu_peak
+)
+
+invest_initial = bat_capacite * capex
+opex_total = invest_initial * (opex / 100) * duree
+cashflow_net = revenu_total * duree - opex_total
+
+roi = (cashflow_net - invest_initial) / invest_initial * 100
+
+colA, colB = st.columns(2)
+colA.metric("💰 Revenu total annuel estimé", f"{revenu_total:,.0f} CHF/an")
+colA.metric("📊 ROI sur la durée du projet", f"{roi:.1f} %")
+colB.metric("⚡ Rendement système", f"{rendement} %")
+colB.metric("💸 CAPEX total", f"{invest_initial:,.0f} CHF")
+
+st.divider()
+
+if ENTSOE_API_KEY and price_data is None:
+    st.warning(
+        "Simulation réalisée avec succès. Une fois la clé ENTSO-E obtenue, les données réelles remplaceront les profils simulés."
+    )
+elif price_data is not None:
+    st.success("Simulation réalisée avec les prix réels Swissgrid (ENTSO-E).")
+
+st.caption("🧠 Ce simulateur est une version de démonstration — les valeurs réelles peuvent varier selon le site, les tarifs et les conditions Swissgrid.")
+
