@@ -1,6 +1,6 @@
-streamlit
-pandas
-numpy
-matplotlib
-requests
-lxml
+streamlit>=1.37.0
+pandas>=2.2.0
+numpy>=1.26.0
+matplotlib>=3.8.0
+requests>=2.31.0
+lxml>=4.9.3
