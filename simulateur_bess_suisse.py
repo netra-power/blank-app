@@ -30,7 +30,7 @@ plt.rcParams.update({
 COLORS = {
     "pv": "#FFEE8C",
     "bess_charge": "#BFE3F1",
-    "bess_discharge": "#BFE3F1",
+    "bess_discharge": "#9CCFE2",
     "load": "#FFAB72",
     "grid_export": "#D7F4C2",
     "grid_import": "#A8D79E",
