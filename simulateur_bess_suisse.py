@@ -398,8 +398,15 @@ with row1_col1:
     if sum(sizes) <= 0: sizes = [1,0,0]
     colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
     ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors,
-           textprops={"color": COLORS["text"]})
-    ax.set_title("Répartition de la production PV", color=COLORS["text"])
+           ax.pie(
+    sizes,
+    labels=labels,
+    autopct="%1.0f%%",
+    startangle=90,
+    colors=colors,
+    textprops={"color": COLORS["text"], "fontsize": 8}
+))
+    ax.set_title("Répartition de la production PV", fontsize=10, color=COLORS["text"])
     st.pyplot(fig)
 
 with row1_col2:
@@ -419,7 +426,14 @@ with row2_col1:
     sizes = [pv_self_no_bess.sum(), 0.0, grid_to_load_no_bess.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
     colors = [COLORS["pv"], COLORS["bess_discharge"], COLORS["grid_import"]]
-    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors, textprops={"color": COLORS["text"]})
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors, ax.pie(
+    sizes,
+    labels=labels,
+    autopct="%1.0f%%",
+    startangle=90,
+    colors=colors,
+    textprops={"color": COLORS["text"], "fontsize": 8}
+))
     ax.set_title("Sans batterie", color=COLORS["text"])
     st.pyplot(fig)
 
@@ -430,7 +444,14 @@ with row2_col2:
     sizes = [pv_self.sum(), bess_to_load.sum(), grid_to_load.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
     colors = [COLORS["pv"], COLORS["bess_discharge"], COLORS["grid_import"]]
-    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors, textprops={"color": COLORS["text"]})
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors, ax.pie(
+    sizes,
+    labels=labels,
+    autopct="%1.0f%%",
+    startangle=90,
+    colors=colors,
+    textprops={"color": COLORS["text"], "fontsize": 8}
+))
     ax.set_title("Avec batterie", color=COLORS["text"])
     st.pyplot(fig)
 
