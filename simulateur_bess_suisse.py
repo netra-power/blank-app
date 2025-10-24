@@ -375,18 +375,15 @@ with left_rev:
     st.dataframe(rev_df.style.format({"CHF/an": "{:,.0f}"}), use_container_width=True)
 
 with right_cf:
-    st.markdown("### 💵 Cashflow cumulé (actualisé)")
+    st.markdown("### 💵 Cashflow cumulé")
     fig, ax = plt.subplots(figsize=(3.5,1.8))  # 50% plus petit
-    # --- Style fin des bordures ---
     for spine in ax.spines.values():
         spine.set_linewidth(0.4)   # bordures fines
         spine.set_color("#CCCCCC") # gris doux
-
     ax.plot(cum_years, cum_discounted, linewidth=1.4, color=COLORS["bess_charge"])
     ax.axhline(0, color="#CCCCCC", linewidth=1)
     ax.set_xlabel("Années", fontsize=6, color=COLORS["text"])
     ax.set_ylabel("CHF (actualisés)", fontsize=6, color=COLORS["text"])
-    ax.set_title("Cashflow cumulé", fontsize=6, color=COLORS["text"])
     ax.tick_params(axis="both", labelsize=6)
     st.pyplot(fig, dpi=180)
 
