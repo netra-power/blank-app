@@ -11,6 +11,15 @@ import streamlit as st
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
+from io import BytesIO
+import base64
+
+def fig_to_svg(fig):
+    buf = BytesIO()
+    fig.savefig(buf, format="svg", bbox_inches="tight")
+    return buf.getvalue().decode("utf-8")
+
+
 
 # -----------------------------
 # Configuration générale (UI + Matplotlib)
@@ -403,10 +412,11 @@ with right_cf:
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ",")))
 
 
-    ax.set_xlabel("Années", fontsize=4, color=COLORS["text"])
-    ax.set_ylabel("CHF (actualisés)", fontsize=4, color=COLORS["text"])
-    ax.tick_params(axis="both", labelsize=4)
-    st.pyplot(fig, bbox_inches="tight")
+    ax.set_xlabel("Années", fontsize=5, color=COLORS["text"])
+    ax.set_ylabel("CHF (actualisés)", fontsize=5, color=COLORS["text"])
+    ax.tick_params(axis="both", labelsize=5)
+    st.image(fig_to_svg(fig), use_column_width=True)
+
 
 
 # En-tête métriques
