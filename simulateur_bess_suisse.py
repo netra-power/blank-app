@@ -383,7 +383,14 @@ left_rev, right_cf = st.columns([1.2, 1.0])
 with left_rev:
     st.markdown("### 💰 Détail des revenus (CHF/an)")
     rev_df = pd.DataFrame(revenus.items(), columns=["Source", "CHF/an"])
-    st.dataframe(rev_df.style.format({"CHF/an": "{:,.0f}"}), use_container_width=True)
+    st.dataframe(
+    rev_df.style.format({"CHF/an": "{:,.0f}"}).set_table_styles([
+        {"selector": "th", "props": [("text-align", "center")]},
+        {"selector": "td", "props": [("text-align", "right"), ("padding", "3px 8px")]},
+    ]),
+    use_container_width=False,
+    )
+
 
 with right_cf:
     st.markdown("### 💵 Cashflow cumulé")
@@ -412,9 +419,9 @@ with right_cf:
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ",")))
 
 
-    ax.set_xlabel("Années", fontsize=5, color=COLORS["text"])
-    ax.set_ylabel("CHF (actualisés)", fontsize=5, color=COLORS["text"])
-    ax.tick_params(axis="both", labelsize=5)
+    ax.set_xlabel("Années", fontsize=4.5, color=COLORS["text"])
+    ax.set_ylabel("CHF (actualisés)", fontsize=4.5, color=COLORS["text"])
+    ax.tick_params(axis="both", labelsize=4.5)
     st.image(fig_to_svg(fig), use_container_width=True)
 
 
