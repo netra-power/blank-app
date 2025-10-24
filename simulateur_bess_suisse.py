@@ -9,6 +9,8 @@ import pandas as pd
 import requests
 import streamlit as st
 import matplotlib.pyplot as plt
+from matplotlib.ticker import FuncFormatter
+
 
 # -----------------------------
 # Configuration générale (UI + Matplotlib)
@@ -391,12 +393,15 @@ with right_cf:
     ax.axhline(0, color="#CCCCCC", linewidth=0.8, linestyle="--")
     # Graduation tous les 50k CHF
     ymin, ymax = ax.get_ylim()
-    step = 50 000
+    step = 50000
     ax.set_yticks(np.arange(
     round(ymin / step) * step,
     round(ymax / step) * step + step,
     step
     ))
+    # Format des nombres en ordonnée avec séparateur de milliers
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ",")))
+
 
     ax.set_xlabel("Années", fontsize=6, color=COLORS["text"])
     ax.set_ylabel("CHF (actualisés)", fontsize=6, color=COLORS["text"])
