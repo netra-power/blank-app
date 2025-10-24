@@ -1,6 +1,6 @@
 # simulateur_bess_suisse.py
-# Simulateur revenus BESS Suisse — version pastel pro, graphiques alignés 2x2
-# Fonctions identiques à la version précédente + bugfix + UI améliorée
+# Simulateur revenus BESS Suisse — Version pastel pro (graphiques 2x2, camemberts & cashflow réduits, palette personnalisée)
+# Conserve toutes les fonctionnalités précédentes + corrections et UI améliorée
 
 from datetime import datetime, timedelta
 import xml.etree.ElementTree as ET
@@ -26,14 +26,16 @@ plt.rcParams.update({
     "legend.frameon": False,
 })
 
-PALETTE = {
-    "blue": "#8AB6D6",
-    "green": "#A7D7C5",
-    "peach": "#F8CBA6",
-    "lavender": "#B6B0D0",
-    "sand": "#F4E3B2",
+# Palette couleurs (validée)
+COLORS = {
+    "pv": "#FFEE8C",
+    "bess_charge": "#62A9C6",
+    "bess_discharge": "#4B94B0",
+    "load": "#B7D9B1",
+    "grid_export": "#E2B007",
+    "grid_import": "#F3C77A",
+    "text": "#2F3A4A",
     "grey": "#9AA0A6",
-    "dark": "#2F3A4A",
 }
 
 # -----------------------------
@@ -306,7 +308,7 @@ charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_
     load, pv, prices, batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
 )
 
-# Convert to Series for masking operations (bugfix)
+# Convert to Series for masking operations
 charged_s = pd.Series(charged, index=idx)
 discharged_s = pd.Series(discharged, index=idx)
 
@@ -364,30 +366,40 @@ cum_years = list(range(0, years_int+1))
 # Résultats
 # -----------------------------
 st.subheader("📊 Résultats")
-col_top1, col_top2 = st.columns(2)
-col_top1.metric("Revenu annuel total", f"{total_rev:,.0f} CHF")
-col_top2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
 
-# Détail revenus
-st.markdown("### 💰 Détail des revenus (CHF/an)")
-rev_df = pd.DataFrame(revenus.items(), columns=["Source", "CHF/an"])
-st.dataframe(rev_df.style.format({"CHF/an": "{:,.0f}"}), use_container_width=True)
+# Détail revenus + Cashflow (graphiques réduits et côte à côte)
+left_rev, right_cf = st.columns([1.2, 1.0])
+with left_rev:
+    st.markdown("### 💰 Détail des revenus (CHF/an)")
+    rev_df = pd.DataFrame(revenus.items(), columns=["Source", "CHF/an"])
+    st.dataframe(rev_df.style.format({"CHF/an": "{:,.0f}"}), use_container_width=True)
 
-# ---------- Ligne 1 (2x2) : PV split + Autoconso table / Sources sans et avec BESS ----------
+with right_cf:
+    st.markdown("### 💵 Cashflow cumulé (actualisé)")
+    fig, ax = plt.subplots(figsize=(5,2.5))  # 50% plus petit
+    ax.plot(cum_years, cum_discounted, marker="o", linewidth=1.5, color=COLORS["bess_charge"])
+    ax.axhline(0, color="#CCCCCC", linewidth=1)
+    ax.set_xlabel("Années"); ax.set_ylabel("CHF (actualisés)")
+    ax.set_title("Cashflow cumulé", color=COLORS["text"])
+    st.pyplot(fig)
+
+# En-tête métriques
+m1, m2 = st.columns(2)
+m1.metric("Revenu annuel total", f"{total_rev:,.0f} CHF")
+m2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
+
+# ---------- Ligne 1 (2x2) : PV split + Autoconso table ----------
 row1_col1, row1_col2 = st.columns(2)
-
 with row1_col1:
     st.markdown("#### ☀️ PV — Répartition")
-    fig, ax = plt.subplots(figsize=(4,4))
-    labels = ["Autoconsommation directe", "Vers batterie", "Export"]
+    fig, ax = plt.subplots(figsize=(3,3))  # réduit 50%
+    labels = ["Autoconso directe", "Vers batterie", "Export"]
     sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
-    colors = [PALETTE["green"], PALETTE["blue"], PALETTE["sand"]]
-    wedges, texts, autotexts = ax.pie(
-        sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors,
-        textprops={"color": PALETTE["dark"]}
-    )
-    ax.set_title("Répartition de la production PV", color=PALETTE["dark"])
+    colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors,
+           textprops={"color": COLORS["text"]})
+    ax.set_title("Répartition de la production PV", color=COLORS["text"])
     st.pyplot(fig)
 
 with row1_col2:
@@ -396,46 +408,43 @@ with row1_col2:
         "Scénario": ["PV sans BESS", "PV avec BESS"],
         "Autoconsommation (%)": [autoconso_no_bess, autoconso_with_bess]
     })
-    st.dataframe(ac_df.style.format({"Autoconsommation (%)": "{:,.0f}"}), use_container_width=True)
+    st.dataframe(ac_df.style.format({"Autoconsommation (%)": "{:,.0f}"}), use_container_width=False)
 
 # ---------- Ligne 2 (2x2) : Sources d'énergie sans/avec BESS ----------
 row2_col1, row2_col2 = st.columns(2)
-
 with row2_col1:
     st.markdown("#### 🔌 Sources d'énergie — Sans batterie")
-    fig, ax = plt.subplots(figsize=(4,4))
-    labels = ["PV direct", "BESS", "Réseau"]
+    fig, ax = plt.subplots(figsize=(3,3))  # réduit 50%
+    labels = ["PV direct", "BESS", "Réseau (import)"]
     sizes = [pv_self_no_bess.sum(), 0.0, grid_to_load_no_bess.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
-    colors = [PALETTE["green"], PALETTE["lavender"], PALETTE["grey"]]
-    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors, textprops={"color": PALETTE["dark"]})
-    ax.set_title("Sans batterie", color=PALETTE["dark"])
+    colors = [COLORS["pv"], COLORS["bess_discharge"], COLORS["grid_import"]]
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors, textprops={"color": COLORS["text"]})
+    ax.set_title("Sans batterie", color=COLORS["text"])
     st.pyplot(fig)
 
 with row2_col2:
     st.markdown("#### 🔋 Sources d'énergie — Avec batterie")
-    fig, ax = plt.subplots(figsize=(4,4))
-    labels = ["PV direct", "BESS", "Réseau"]
+    fig, ax = plt.subplots(figsize=(3,3))  # réduit 50%
+    labels = ["PV direct", "BESS (décharge)", "Réseau (import)"]
     sizes = [pv_self.sum(), bess_to_load.sum(), grid_to_load.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
-    colors = [PALETTE["green"], PALETTE["lavender"], PALETTE["grey"]]
-    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors, textprops={"color": PALETTE["dark"]})
-    ax.set_title("Avec batterie", color=PALETTE["dark"])
+    colors = [COLORS["pv"], COLORS["bess_discharge"], COLORS["grid_import"]]
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors, textprops={"color": COLORS["text"]})
+    ax.set_title("Avec batterie", color=COLORS["text"])
     st.pyplot(fig)
 
-# ---------- Profils été/hiver (2x2) si PV + BESS + bâtiment ----------
+# ---------- Profils été/hiver (2x2) ----------
 if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_kw > 0):
     st.markdown("### 📈 Profils — Journées type été / hiver")
 
     def day_slice(date_str):
         d0 = pd.Timestamp(date_str)
-        mask = (idx >= d0) & (idx < d0 + pd.Timedelta(days=1))
-        return mask
+        return (idx >= d0) & (idx < d0 + pd.Timedelta(days=1))
 
     mask_summer = day_slice("2024-07-15")
     mask_winter = day_slice("2024-01-15")
 
-    # Ligne 3 : Conso vs PV été / hiver (avec hachures autoconsommation)
     r3c1, r3c2 = st.columns(2)
     for label, mask, col in [("Été (15 juillet)", mask_summer, r3c1), ("Hiver (15 janvier)", mask_winter, r3c2)]:
         lday = load[mask].values
@@ -443,24 +452,23 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
         tday = load[mask].index
 
         fig, ax = plt.subplots(figsize=(8,3))
-        ax.plot(tday, lday, label="Conso (kWh/h)", color=PALETTE["dark"], linewidth=1.5)
-        ax.plot(tday, pvday, label="PV (kWh/h)", color=PALETTE["green"], linewidth=1.5)
+        ax.plot(tday, lday, label="Conso (kWh/h)", color=COLORS["load"], linewidth=1.8)
+        ax.plot(tday, pvday, label="PV (kWh/h)", color=COLORS["pv"], linewidth=1.6)
         auto_day = np.minimum(lday, pvday)
-        ax.fill_between(tday, 0, auto_day, hatch='//', alpha=0.15, color=PALETTE["green"], label="Autoconsommation")
-        ax.set_title(f"Conso vs PV — {label}", color=PALETTE["dark"])
+        ax.fill_between(tday, 0, auto_day, hatch='//', alpha=0.18, color=COLORS["pv"], label="Autoconsommation")
+        ax.set_title(f"Conso vs PV — {label}", color=COLORS["text"])
         ax.legend()
         col.pyplot(fig)
 
-    # Ligne 4 : Flux batterie été / hiver
     r4c1, r4c2 = st.columns(2)
     for label, mask, col in [("Été (15 juillet)", mask_summer, r4c1), ("Hiver (15 janvier)", mask_winter, r4c2)]:
         tday = load[mask].index
         ch_day = charged_s[mask].values
         dis_day = discharged_s[mask].values
         fig2, ax2 = plt.subplots(figsize=(8,3))
-        ax2.bar(tday, ch_day, width=0.03, label="Charge (kWh/h)", color=PALETTE["blue"], alpha=0.8)
-        ax2.bar(tday, dis_day, width=0.03, label="Décharge (kWh/h)", color=PALETTE["lavender"], alpha=0.8)
-        ax2.set_title(f"Flux batterie — {label}", color=PALETTE["dark"])
+        ax2.bar(tday, ch_day, width=0.03, label="Charge (kWh/h)", color=COLORS["bess_charge"], alpha=0.9)
+        ax2.bar(tday, dis_day, width=0.03, label="Décharge (kWh/h)", color=COLORS["bess_discharge"], alpha=0.9)
+        ax2.set_title(f"Flux batterie — {label}", color=COLORS["text"])
         ax2.legend()
         col.pyplot(fig2)
 
@@ -472,25 +480,16 @@ if ("bâtiment" in system_type.lower()) and (marche_libre == "Oui"):
     after_monthly_peak = pd.Series(net_after.values, index=idx).groupby(month_index).max()
 
     fig, ax = plt.subplots(figsize=(10,3))
-    ax.bar(before_monthly_peak.index-0.2, before_monthly_peak.values, width=0.4, label="Avant BESS", color=PALETTE["grey"])
-    ax.bar(after_monthly_peak.index+0.2, after_monthly_peak.values, width=0.4, label="Après BESS", color=PALETTE["blue"])
+    ax.bar(before_monthly_peak.index-0.2, before_monthly_peak.values, width=0.4, label="Avant BESS", color=COLORS["grid_import"])
+    ax.bar(after_monthly_peak.index+0.2, after_monthly_peak.values, width=0.4, label="Après BESS", color=COLORS["bess_charge"])
     ax.set_xlabel("Mois"); ax.set_ylabel("kW")
     ax.set_xticks(range(1,13))
-    ax.set_title("Pics mensuels de puissance (avant / après)", color=PALETTE["dark"])
+    ax.set_title("Pics mensuels de puissance (avant / après)", color=COLORS["text"])
     ax.legend()
     st.pyplot(fig)
-
-# ---------- Cashflow cumulé ----------
-st.markdown("### 💵 Cashflow cumulé (actualisé)")
-fig, ax = plt.subplots(figsize=(10,3))
-ax.plot(cum_years, cum_discounted, marker="o", linewidth=1.5, color=PALETTE["blue"])
-ax.axhline(0, color="#CCCCCC", linewidth=1)
-ax.set_xlabel("Années"); ax.set_ylabel("CHF (actualisés)")
-ax.set_title("Évolution du cashflow cumulé (CAPEX + revenus)", color=PALETTE["dark"])
-st.pyplot(fig)
 
 st.caption(
     "Remarques : Les prix ENTSO-E (Swissgrid) sont utilisés si la clé API est fournie. "
     "Les fichiers CSV doivent contenir 8760 valeurs horaires (kWh/h) sans en-tête. "
-    "La palette de couleurs pastel pro est appliquée à tous les graphiques."
+    "Charte : PV=#FFEE8C, BESS charge=#62A9C6, BESS décharge=#4B94B0, Conso=#B7D9B1, Import réseau=#F3C77A, Export réseau=#E2B007."
 )
