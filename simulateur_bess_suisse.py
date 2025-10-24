@@ -376,14 +376,19 @@ with left_rev:
 
 with right_cf:
     st.markdown("### 💵 Cashflow cumulé (actualisé)")
-    fig, ax = plt.subplots(figsize=(4,2))  # 50% plus petit
+    fig, ax = plt.subplots(figsize=(3.5,1.8))  # 50% plus petit
+    # --- Style fin des bordures ---
+    for spine in ax.spines.values():
+        spine.set_linewidth(0.4)   # bordures fines
+        spine.set_color("#CCCCCC") # gris doux
+
     ax.plot(cum_years, cum_discounted, linewidth=1.4, color=COLORS["bess_charge"])
     ax.axhline(0, color="#CCCCCC", linewidth=1)
     ax.set_xlabel("Années", fontsize=6, color=COLORS["text"])
     ax.set_ylabel("CHF (actualisés)", fontsize=6, color=COLORS["text"])
     ax.set_title("Cashflow cumulé", fontsize=6, color=COLORS["text"])
     ax.tick_params(axis="both", labelsize=6)
-    st.pyplot(fig)
+    st.pyplot(fig, dpi=180)
 
 # En-tête métriques
 m1, m2 = st.columns(2)
