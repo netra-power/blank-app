@@ -381,20 +381,29 @@ st.subheader("📊 Résultats")
 # Détail revenus + Cashflow (graphiques réduits et côte à côte)
 left_rev, right_cf = st.columns([1.2, 1.0])
 with left_rev:
-    st.markdown("### 💰 Détail des revenus (CHF/an)")
-    rev_df = pd.DataFrame(revenus.items(), columns=["Source", "Revenus"])
-   # Tableau revenus centré via Markdown (aligne la 2e colonne au centre)
-    rev_df_md = rev_df.copy()
-    rev_df_md["Revenus"] = rev_df_md["Revenus"].apply(lambda x: f"{x:,.0f}".replace(",", " "))  # séparateur milliers fin
+  # Renomme la colonne et formate les valeurs
+rev_df = pd.DataFrame(revenus.items(), columns=["Source", "Revenus (CHF/an)"])
+rev_df["Revenus (CHF/an)"] = rev_df["Revenus (CHF/an)"].astype(float).round(0)
 
-    rows = "\n".join([f"| {row['Source']} | {row['Revenus']} |" for _, row in rev_df_md.iterrows()])
-    table_md = (
-        "| Source | Revenus |\n"
-        "|:--|:--:|\n"  # <- 2e colonne centrée
-        + rows
-    )
+# Tableau propre, centré, redimensionnable
+st.data_editor(
+    rev_df,
+    hide_index=True,              # enlève la colonne 0,1,2...
+    use_container_width=True,     # garde l'alignement avec le Cashflow à droite
+    column_config={
+        "Source": st.column_config.TextColumn(
+            "Source",
+            width="medium"        # tu peux mettre "small", "medium", "large" ou un nombre en px: width=140
+        ),
+        "Revenus (CHF/an)": st.column_config.NumberColumn(
+            "Revenus (CHF/an)",
+            format="%.0f CHF",    # format financier
+            width="small",        # colonne compacte & redimensionnable à la souris
+            help="Revenus annuels générés par cette source"
+        ),
+    },
+)
 
-st.markdown(table_md)
 
 
 
