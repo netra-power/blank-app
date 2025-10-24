@@ -403,9 +403,9 @@ with right_cf:
     ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ",")))
 
 
-    ax.set_xlabel("Années", fontsize=6, color=COLORS["text"])
-    ax.set_ylabel("CHF (actualisés)", fontsize=6, color=COLORS["text"])
-    ax.tick_params(axis="both", labelsize=6)
+    ax.set_xlabel("Années", fontsize=4, color=COLORS["text"])
+    ax.set_ylabel("CHF (actualisés)", fontsize=4, color=COLORS["text"])
+    ax.tick_params(axis="both", labelsize=4)
     st.pyplot(fig, bbox_inches="tight")
 
 
