@@ -376,16 +376,33 @@ with left_rev:
 
 with right_cf:
     st.markdown("### 💵 Cashflow cumulé")
+    plt.rcParams.update({
+    "font.size": 7,
+    "axes.labelsize": 7,
+    "axes.titlesize": 8,
+    "xtick.labelsize": 6,
+    "ytick.labelsize": 6,
+    })
     fig, ax = plt.subplots(figsize=(3.5,1.8))  # 50% plus petit
     for spine in ax.spines.values():
         spine.set_linewidth(0.4)   # bordures fines
         spine.set_color("#CCCCCC") # gris doux
-    ax.plot(cum_years, cum_discounted, linewidth=1.4, color=COLORS["bess_charge"])
-    ax.axhline(0, color="#CCCCCC", linewidth=1)
+    ax.plot(cum_years, cum_discounted, linewidth=1.3, color=COLORS["bess_charge"])
+    ax.axhline(0, color="#CCCCCC", linewidth=0.8, linestyle="--")
+    # Graduation tous les 50k CHF
+    ymin, ymax = ax.get_ylim()
+    step = 50000
+    ax.set_yticks(np.arange(
+    round(ymin / step) * step,
+    round(ymax / step) * step + step,
+    step
+    ))
+
     ax.set_xlabel("Années", fontsize=6, color=COLORS["text"])
     ax.set_ylabel("CHF (actualisés)", fontsize=6, color=COLORS["text"])
     ax.tick_params(axis="both", labelsize=6)
-    st.pyplot(fig, dpi=180)
+    st.pyplot(fig, bbox_inches="tight")
+
 
 # En-tête métriques
 m1, m2 = st.columns(2)
