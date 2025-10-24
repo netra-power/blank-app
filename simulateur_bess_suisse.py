@@ -383,17 +383,19 @@ left_rev, right_cf = st.columns([1.2, 1.0])
 with left_rev:
     st.markdown("### 💰 Détail des revenus (CHF/an)")
     rev_df = pd.DataFrame(revenus.items(), columns=["Source", "Revenus"])
-    st.dataframe(
-    rev_df.style
-        .format({"Revenus": "{:,.0f}"})
-        .set_table_styles([
-            {"selector": "th", "props": [("text-align", "center")]},
-            {"selector": "td", "props": [("text-align", "center")]},
-        ])
-        .set_properties(subset=["Revenus"], **{"text-align": "center"}),
-    hide_index=True,
-    use_container_width=True,
+   # Tableau revenus centré via Markdown (aligne la 2e colonne au centre)
+    rev_df_md = rev_df.copy()
+    rev_df_md["Revenus"] = rev_df_md["Revenus"].apply(lambda x: f"{x:,.0f}".replace(",", " "))  # séparateur milliers fin
+
+    rows = "\n".join([f"| {row['Source']} | {row['Revenus']} |" for _, row in rev_df_md.iterrows()])
+    table_md = (
+        "| Source | Revenus |\n"
+        "|:--|:--:|\n"  # <- 2e colonne centrée
+        + rows
     )
+
+st.markdown(table_md)
+
 
 
 
