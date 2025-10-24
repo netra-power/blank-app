@@ -29,8 +29,8 @@ plt.rcParams.update({
 # Palette couleurs (validée)
 COLORS = {
     "pv": "#FFEE8C",
-    "bess_charge": "#62A9C6",
-    "bess_discharge": "#4B94B0",
+    "bess_charge": "#BFE3F1",
+    "bess_discharge": "#BFE3F1",
     "load": "#FFAB72",
     "grid_export": "#D7F4C2",
     "grid_import": "#A8D79E",
