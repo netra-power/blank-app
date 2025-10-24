@@ -377,13 +377,13 @@ with left_rev:
 with right_cf:
     st.markdown("### 💵 Cashflow cumulé")
     plt.rcParams.update({
-    "font.size": 7,
-    "axes.labelsize": 7,
-    "axes.titlesize": 8,
+    "font.size": 6,
+    "axes.labelsize": 6,
+    "axes.titlesize": 6,
     "xtick.labelsize": 6,
     "ytick.labelsize": 6,
     })
-    fig, ax = plt.subplots(figsize=(3.5,1.8))  # 50% plus petit
+    fig, ax = plt.subplots(figsize=(3,1.5))  # 50% plus petit
     for spine in ax.spines.values():
         spine.set_linewidth(0.4)   # bordures fines
         spine.set_color("#CCCCCC") # gris doux
@@ -391,7 +391,7 @@ with right_cf:
     ax.axhline(0, color="#CCCCCC", linewidth=0.8, linestyle="--")
     # Graduation tous les 50k CHF
     ymin, ymax = ax.get_ylim()
-    step = 50000
+    step = 50 000
     ax.set_yticks(np.arange(
     round(ymin / step) * step,
     round(ymax / step) * step + step,
