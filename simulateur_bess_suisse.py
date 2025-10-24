@@ -32,8 +32,8 @@ COLORS = {
     "bess_charge": "#62A9C6",
     "bess_discharge": "#4B94B0",
     "load": "#B7D9B1",
-    "grid_export": "#E2B007",
-    "grid_import": "#F3C77A",
+    "grid_export": "#D7F4C2",
+    "grid_import": "#A8D79E",
     "text": "#2F3A4A",
     "grey": "#9AA0A6",
 }
@@ -376,7 +376,7 @@ with left_rev:
 
 with right_cf:
     st.markdown("### 💵 Cashflow cumulé (actualisé)")
-    fig, ax = plt.subplots(figsize=(5,2.5))  # 50% plus petit
+    fig, ax = plt.subplots(figsize=(4,2))  # 50% plus petit
     ax.plot(cum_years, cum_discounted, marker="o", linewidth=1.5, color=COLORS["bess_charge"])
     ax.axhline(0, color="#CCCCCC", linewidth=1)
     ax.set_xlabel("Années"); ax.set_ylabel("CHF (actualisés)")
@@ -392,7 +392,7 @@ m2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
 row1_col1, row1_col2 = st.columns(2)
 with row1_col1:
     st.markdown("#### ☀️ PV — Répartition")
-    fig, ax = plt.subplots(figsize=(3,3))  # réduit 50%
+    fig, ax = plt.subplots(figsize=(2,2))  # réduit 50%
     labels = ["Autoconso directe", "Vers batterie", "Export"]
     sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
@@ -414,7 +414,7 @@ with row1_col2:
 row2_col1, row2_col2 = st.columns(2)
 with row2_col1:
     st.markdown("#### 🔌 Sources d'énergie — Sans batterie")
-    fig, ax = plt.subplots(figsize=(3,3))  # réduit 50%
+    fig, ax = plt.subplots(figsize=(2,2))  # réduit 50%
     labels = ["PV direct", "BESS", "Réseau (import)"]
     sizes = [pv_self_no_bess.sum(), 0.0, grid_to_load_no_bess.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
@@ -425,7 +425,7 @@ with row2_col1:
 
 with row2_col2:
     st.markdown("#### 🔋 Sources d'énergie — Avec batterie")
-    fig, ax = plt.subplots(figsize=(3,3))  # réduit 50%
+    fig, ax = plt.subplots(figsize=(2,2))  # réduit 50%
     labels = ["PV direct", "BESS (décharge)", "Réseau (import)"]
     sizes = [pv_self.sum(), bess_to_load.sum(), grid_to_load.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
