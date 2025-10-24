@@ -415,7 +415,8 @@ with right_cf:
     ax.set_xlabel("Années", fontsize=5, color=COLORS["text"])
     ax.set_ylabel("CHF (actualisés)", fontsize=5, color=COLORS["text"])
     ax.tick_params(axis="both", labelsize=5)
-    st.image(fig_to_svg(fig), use_column_width=True)
+    st.image(fig_to_svg(fig), use_container_width=True)
+
 
 
 
