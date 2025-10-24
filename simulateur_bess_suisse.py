@@ -154,7 +154,7 @@ with st.sidebar:
     else:
         marche_libre = "Non"
 
-    eur_chf = st.number_input("Taux EUR → CHF", min_value=0.5, max_value=2.0, value=1.0, step=0.01)
+    eur_chf = st.number_input("Taux EUR→CHF", min_value=0.5, max_value=2.0, value=1.0, step=0.01)
 
     st.subheader("📊 Bâtiment — Consommation")
     st.markdown("> ⚙️ **Format CSV attendu :** 1 colonne, 8760 valeurs horaires (kWh/h), sans en-tête (séparateur ',' ou ';').")
@@ -376,24 +376,12 @@ with left_rev:
 
 with right_cf:
     st.markdown("### 💵 Cashflow cumulé (actualisé)")
-    fig, ax = plt.subplots(figsize=(2.2,2.2))
-labels = ["Autoconso directe", "Vers batterie", "Export"]
-sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
-if sum(sizes) <= 0:
-    sizes = [1,0,0]
-colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
-wedges, texts, autotexts = ax.pie(
-    sizes,
-    labels=labels,
-    autopct=lambda p: f"{p:.0f}%",
-    startangle=90,
-    colors=colors,
-    wedgeprops={"linewidth": 0.8, "edgecolor": "white"},
-    textprops={"fontsize": 8, "color": COLORS["text"]},
-)
-ax.set_title("Répartition de la production PV", fontsize=10, color=COLORS["text"])
-st.pyplot(fig)
-
+    fig, ax = plt.subplots(figsize=(5,2.5))  # 50% plus petit
+    ax.plot(cum_years, cum_discounted, marker="o", linewidth=1.5, color=COLORS["bess_charge"])
+    ax.axhline(0, color="#CCCCCC", linewidth=1)
+    ax.set_xlabel("Années"); ax.set_ylabel("CHF (actualisés)")
+    ax.set_title("Cashflow cumulé", color=COLORS["text"])
+    st.pyplot(fig)
 
 # En-tête métriques
 m1, m2 = st.columns(2)
@@ -404,24 +392,15 @@ m2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
 row1_col1, row1_col2 = st.columns(2)
 with row1_col1:
     st.markdown("#### ☀️ PV — Répartition")
-    fig, ax = plt.subplots(figsize=(2.2,2.2))
-labels = ["Autoconso directe", "Vers batterie", "Export"]
-sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
-if sum(sizes) <= 0:
-    sizes = [1,0,0]
-colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
-wedges, texts, autotexts = ax.pie(
-    sizes,
-    labels=labels,
-    autopct=lambda p: f"{p:.0f}%",
-    startangle=90,
-    colors=colors,
-    wedgeprops={"linewidth": 0.8, "edgecolor": "white"},
-    textprops={"fontsize": 8, "color": COLORS["text"]},
-)
-ax.set_title("Répartition de la production PV", fontsize=10, color=COLORS["text"])
-st.pyplot(fig)
-
+    fig, ax = plt.subplots(figsize=(3,3))  # réduit 50%
+    labels = ["Autoconso directe", "Vers batterie", "Export"]
+    sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
+    if sum(sizes) <= 0: sizes = [1,0,0]
+    colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors,
+           textprops={"color": COLORS["text"]})
+    ax.set_title("Répartition de la production PV", color=COLORS["text"])
+    st.pyplot(fig)
 
 with row1_col2:
     st.markdown("#### 🏢 Autoconsommation du bâtiment")
@@ -435,41 +414,23 @@ with row1_col2:
 row2_col1, row2_col2 = st.columns(2)
 with row2_col1:
     st.markdown("#### 🔌 Sources d'énergie — Sans batterie")
-    fig, ax = plt.subplots(figsize=(2.2,2.2))
-labels = ["Autoconso directe", "Vers batterie", "Export"]
-sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
-if sum(sizes) <= 0:
-    sizes = [1,0,0]
-colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
-wedges, texts, autotexts = ax.pie(
-    sizes,
-    labels=labels,
-    autopct=lambda p: f"{p:.0f}%",
-    startangle=90,
-    colors=colors,
-    wedgeprops={"linewidth": 0.8, "edgecolor": "white"},
-    textprops={"fontsize": 8, "color": COLORS["text"]},
-)
-ax.set_title("Répartition de la production PV", fontsize=10, color=COLORS["text"])
-st.pyplot(fig)
-
+    fig, ax = plt.subplots(figsize=(3,3))  # réduit 50%
+    labels = ["PV direct", "BESS", "Réseau (import)"]
+    sizes = [pv_self_no_bess.sum(), 0.0, grid_to_load_no_bess.sum()]
+    if sum(sizes) <= 0: sizes = [1,0,0]
+    colors = [COLORS["pv"], COLORS["bess_discharge"], COLORS["grid_import"]]
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors, textprops={"color": COLORS["text"]})
+    ax.set_title("Sans batterie", color=COLORS["text"])
+    st.pyplot(fig)
 
 with row2_col2:
     st.markdown("#### 🔋 Sources d'énergie — Avec batterie")
-    fig, ax = plt.subplots(figsize=(2,2))  # réduit 50%
+    fig, ax = plt.subplots(figsize=(3,3))  # réduit 50%
     labels = ["PV direct", "BESS (décharge)", "Réseau (import)"]
     sizes = [pv_self.sum(), bess_to_load.sum(), grid_to_load.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
     colors = [COLORS["pv"], COLORS["bess_discharge"], COLORS["grid_import"]]
-    wedges, texts, autotexts = ax.pie(
-    sizes,
-    labels=labels,
-    autopct=lambda p: f"{p:.0f}%",
-    startangle=90,
-    colors=colors,
-    wedgeprops={"linewidth": 0.8, "edgecolor": "white"},
-    textprops={"fontsize": 8, "color": COLORS["text"]},
-)
+    ax.pie(sizes, labels=labels, autopct="%1.0f%%", startangle=90, colors=colors, textprops={"color": COLORS["text"]})
     ax.set_title("Avec batterie", color=COLORS["text"])
     st.pyplot(fig)
 
