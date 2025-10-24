@@ -382,18 +382,18 @@ st.subheader("📊 Résultats")
 left_rev, right_cf = st.columns([1.2, 1.0])
 with left_rev:
     st.markdown("### 💰 Détail des revenus (CHF/an)")
-    rev_df = pd.DataFrame(revenus.items(), columns=["Source", "CHF/an"])
+    rev_df = pd.DataFrame(revenus.items(), columns=["Source", "Revenus"])
     st.dataframe(
     rev_df.style
-        .format({"CHF/an": "{:,.0f}"})
+        .format({"Revenus": "{:,.0f}"})
         .set_table_styles([
             {"selector": "th", "props": [("text-align", "center")]},
             {"selector": "td", "props": [("text-align", "center")]},
         ])
-        .set_properties(subset=["CHF/an"], **{"text-align": "center"}),
+        .set_properties(subset=["Revenus"], **{"text-align": "center"}),
     hide_index=True,
     use_container_width=True,
-)
+    )
 
 
 
