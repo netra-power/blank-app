@@ -488,7 +488,7 @@ with row1_col1:
     svg = fig_to_svg(fig)
 
 # Affichage SANS redimensionnement auto (sinon ça grossit tout)
-    st.image(svg, width=140)   # <<< Taille maîtrisée
+    st.image(svg, width=230)   # <<< Taille maîtrisée
 
 
 
