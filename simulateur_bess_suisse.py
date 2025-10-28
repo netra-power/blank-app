@@ -452,7 +452,8 @@ m2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
 row1_col1, row1_col2 = st.columns(2)
 with row1_col1:
     st.markdown("#### ☀️ PV — Répartition")
-    fig, ax = plt.subplots(figsize=(10.0, 10.0), dpi=300)   # <<< taille fixe réelle
+    # --- Camembert PV (version stable & lisible & agrandie) ---
+    fig, ax = plt.subplots(figsize=(1.0,1.0), dpi=300)
 
     labels = ["Autoconso directe", "Vers batterie", "Export"]
     sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
@@ -460,35 +461,33 @@ with row1_col1:
         sizes = [1, 0, 0]
     colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
 
-# Création du camembert
+# Camembert
     wedges, texts, autotexts = ax.pie(
         sizes,
         labels=labels,
-        autopct=lambda p: f"{p:.0f}%",
+        autopct=lambda p: f"{p:.0f}%" if p > 2 else "",  # enlève les % très petits
         startangle=90,
-        colors=colors,
-        textprops={"color": COLORS["text"]}   # taille fixée après
+        colors=colors
     )
 
-# Taille des labels
+# Taille & couleur des labels
     for t in texts:
-        t.set_fontsize(5)
+        t.set_fontsize(8)
+        t.set_color(COLORS["text"])
 
-# Taille des pourcentages
+# Taille & couleur des pourcentages
     for t in autotexts:
-        t.set_fontsize(5)
+        t.set_fontsize(8)
+        t.set_color(COLORS["text"])
 
-# Supprimer le titre
+# Pas de titre
     ax.set_title("")
-
-# Pour éviter l'ellipse quand Streamlit l'affiche
     ax.axis('equal')
 
-# SVG haute qualité
     svg = fig_to_svg(fig)
 
-# Affichage SANS redimensionnement auto (sinon ça grossit tout)
-    st.image(svg, width=230)   # <<< Taille maîtrisée
+# ✅ Taille réelle du camembert contrôlée ici (50% plus grand)
+    st.image(svg, width=340)
 
 
 
