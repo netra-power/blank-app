@@ -468,7 +468,7 @@ with row1_col1:
     autopct=lambda p: f"{p:.0f}%",
     startangle=90,
     colors=colors,
-    radius=0.9   # <<< fixe la taille du camembert, indépendamment du texte
+    radius=0.7   # <<< fixe la taille du camembert, indépendamment du texte
     )
 
 
