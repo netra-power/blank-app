@@ -472,12 +472,12 @@ with row1_col1:
 
 # Taille & couleur des labels
     for t in texts:
-        t.set_fontsize(5)
+        t.set_fontsize(6)
         t.set_color(COLORS["text"])
 
 # Taille & couleur des pourcentages
     for t in autotexts:
-        t.set_fontsize(5)
+        t.set_fontsize(6)
         t.set_color(COLORS["text"])
 
 # Pas de titre
