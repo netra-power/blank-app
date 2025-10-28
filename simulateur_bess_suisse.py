@@ -200,8 +200,8 @@ with st.sidebar:
 
     st.subheader("🔌 Tarification & services")
     if marche_libre == "Non":
-        price_buy_fixed = st.number_input("Tarif achat (CHF/kWh)", min_value=0.0, value=0.22, step=0.01)
-        price_sell_fixed = st.number_input("Tarif revente PV (CHF/kWh)", min_value=0.0, value=0.05, step=0.01)
+        price_buy_fixed = st.number_input("Tarif achat (CHF/kWh)", min_value=0.0, value=0.229, step=0.01)
+        price_sell_fixed = st.number_input("Tarif revente PV (CHF/kWh)", min_value=0.0, value=0.053, step=0.01)
     else:
         price_buy_fixed = price_sell_fixed = None
     peak_tariff = st.number_input("Tarif puissance (CHF/kW/an)", min_value=0.0, value=150.0, step=5.0, format="%.0f")
