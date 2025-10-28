@@ -453,7 +453,7 @@ row1_col1, row1_col2 = st.columns(2)
 with row1_col1:
     st.markdown("#### ☀️ PV — Répartition")
     # --- Camembert PV (version stable & lisible & agrandie) ---
-    fig, ax = plt.subplots(figsize=(1.0,1.0), dpi=300)
+    fig, ax = plt.subplots(figsize=(2.0,2.0), dpi=300)
 
     labels = ["Autoconso directe", "Vers batterie", "Export"]
     sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
@@ -487,7 +487,7 @@ with row1_col1:
     svg = fig_to_svg(fig)
 
 # ✅ Taille réelle du camembert contrôlée ici (50% plus grand)
-    st.image(svg, width=340)
+    st.image(svg, width=500)
 
 
 
