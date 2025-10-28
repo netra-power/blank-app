@@ -452,22 +452,29 @@ m2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
 row1_col1, row1_col2 = st.columns(2)
 with row1_col1:
     st.markdown("#### ☀️ PV — Répartition")
-    fig, ax = plt.subplots(figsize=(1.5,1.5))  # réduit 50%
-    fig.set_dpi(300)   # ← Haute résolution
+    fig, ax = plt.subplots(figsize=(1.2,1.2))
+    fig.set_dpi(300)
+
     labels = ["Autoconso directe", "Vers batterie", "Export"]
     sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
     colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
-    ax.pie(
-    sizes,
-    labels=labels,
-    autopct=lambda p: f"{p:.0f}%",
-    startangle=90,
-    colors=colors,
-    textprops={"color": COLORS["text"], "fontsize": 6},   # ← Texte plus petit
+
+    wedges, texts, autotexts = ax.pie(
+        sizes,
+        labels=labels,
+        autopct=lambda p: f"{p:.0f}%",
+        startangle=90,
+        colors=colors,
+        textprops={"color": COLORS["text"], "fontsize": 6}
     )
-    ax.set_title("Répartition de la production PV", color=COLORS["text"])
+
+    for t in autotexts: t.set_fontsize(6)
+    for t in texts: t.set_fontsize(6)
+
+    ax.set_title("Répartition de la production PV", color=COLORS["text"], fontsize=6)
     st.image(fig_to_svg(fig), use_container_width=True)
+
 
 
 with row1_col2:
