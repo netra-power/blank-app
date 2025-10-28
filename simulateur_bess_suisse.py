@@ -463,12 +463,14 @@ with row1_col1:
 
 # Camembert
     wedges, texts, autotexts = ax.pie(
-        sizes,
-        labels=labels,
-        autopct=lambda p: f"{p:.0f}%" if p > 2 else "",  # enlève les % très petits
-        startangle=90,
-        colors=colors
+    sizes,
+    labels=labels,
+    autopct=lambda p: f"{p:.0f}%",
+    startangle=90,
+    colors=colors,
+    radius=0.9   # <<< fixe la taille du camembert, indépendamment du texte
     )
+
 
 # Taille & couleur des labels
     for t in texts:
