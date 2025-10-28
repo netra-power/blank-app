@@ -452,7 +452,7 @@ m2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
 row1_col1, row1_col2 = st.columns(2)
 with row1_col1:
     st.markdown("#### ☀️ PV — Répartition")
-    fig, ax = plt.subplots(figsize=(5.0, 5.0), dpi=300)   # <<< taille fixe réelle
+    fig, ax = plt.subplots(figsize=(10.0, 10.0), dpi=300)   # <<< taille fixe réelle
 
     labels = ["Autoconso directe", "Vers batterie", "Export"]
     sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
