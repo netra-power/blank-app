@@ -66,7 +66,7 @@ def ensure_len(arr, n=8760):
 def year_hours(start_year=2024):
     return pd.date_range(datetime(start_year, 1, 1, 0, 0), periods=8760, freq="H")
 
-def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2025):
+def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     rng = np.random.RandomState(seed)
     t = np.arange(8760)
     if kind == "Résidentiel":
@@ -87,7 +87,7 @@ def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2025):
     prof *= annual_kwh / prof.sum()
     return pd.Series(prof, index=year_hours(start_year))
 
-def build_pv_profile(kWc, start_year=2025):
+def build_pv_profile(kWc, start_year=2024):
     idx = year_hours(start_year)
     t = np.arange(len(idx))
     day = np.clip(np.sin(2*np.pi*((t%24)-6)/24), 0, None)
@@ -211,7 +211,7 @@ with st.sidebar:
 # -----------------------------
 # Profils (conso & PV)
 # -----------------------------
-idx = year_hours(2025)
+idx = year_hours(2024)
 if cons_upload:
     cons_df = pd.read_csv(cons_upload, header=None, sep=None, engine="python")
     load = ensure_len(cons_df.iloc[:, 0].values, 8760)
