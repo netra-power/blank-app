@@ -66,7 +66,7 @@ def ensure_len(arr, n=8760):
 def year_hours(start_year=2024):
     return pd.date_range(datetime(start_year, 1, 1, 0, 0), periods=8760, freq="H")
 
-def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
+def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2025):
     rng = np.random.RandomState(seed)
     t = np.arange(8760)
     if kind == "Résidentiel":
@@ -87,7 +87,7 @@ def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     prof *= annual_kwh / prof.sum()
     return pd.Series(prof, index=year_hours(start_year))
 
-def build_pv_profile(kWc, start_year=2024):
+def build_pv_profile(kWc, start_year=2025):
     idx = year_hours(start_year)
     t = np.arange(len(idx))
     day = np.clip(np.sin(2*np.pi*((t%24)-6)/24), 0, None)
@@ -187,21 +187,21 @@ with st.sidebar:
         pv_upload = None
 
     st.subheader("🔋 Batterie")
-    batt_kwh = st.number_input("Capacité (kWh)", min_value=0.0, value=200.0, step=10.0, format="%.0f")
-    batt_kw = st.number_input("Puissance (kW)", min_value=0.0, value=100.0, step=10.0, format="%.0f")
+    batt_kwh = st.number_input("Capacité (kWh)", min_value=0.0, value=225.0, step=10.0, format="%.0f")
+    batt_kw = st.number_input("Puissance (kW)", min_value=0.0, value=110.0, step=10.0, format="%.0f")
     eff_rt = st.number_input("Rendement (%)", min_value=50.0, max_value=100.0, value=90.0, step=1.0, format="%.0f") / 100
     dod = st.number_input("Profondeur de décharge (%)", min_value=10.0, max_value=100.0, value=90.0, step=1.0, format="%.0f") / 100
 
     st.subheader("💰 Paramètres économiques")
     capex_pv_per_kwc = st.number_input("CAPEX PV (CHF/kWc)", min_value=0.0, value=900.0, step=10.0, format="%.0f")
     capex_batt_per_kwh = st.number_input("CAPEX Batterie (CHF/kWh)", min_value=0.0, value=350.0, step=10.0, format="%.0f")
-    years = st.number_input("Durée de simulation (ans)", min_value=1.0, max_value=30.0, value=10.0, step=1.0, format="%.0f")
+    years = st.number_input("Durée de simulation (ans)", min_value=1.0, max_value=30.0, value=20.0, step=1.0, format="%.0f")
     disc = st.number_input("Taux d'actualisation (%)", min_value=0.0, max_value=20.0, value=5.0, step=0.1) / 100
 
     st.subheader("🔌 Tarification & services")
     if marche_libre == "Non":
-        price_buy_fixed = st.number_input("Tarif achat (CHF/kWh)", min_value=0.0, value=0.18, step=0.01)
-        price_sell_fixed = st.number_input("Tarif revente PV (CHF/kWh)", min_value=0.0, value=0.08, step=0.01)
+        price_buy_fixed = st.number_input("Tarif achat (CHF/kWh)", min_value=0.0, value=0.22, step=0.01)
+        price_sell_fixed = st.number_input("Tarif revente PV (CHF/kWh)", min_value=0.0, value=0.05, step=0.01)
     else:
         price_buy_fixed = price_sell_fixed = None
     peak_tariff = st.number_input("Tarif puissance (CHF/kW/an)", min_value=0.0, value=150.0, step=5.0, format="%.0f")
@@ -211,7 +211,7 @@ with st.sidebar:
 # -----------------------------
 # Profils (conso & PV)
 # -----------------------------
-idx = year_hours(2024)
+idx = year_hours(2025)
 if cons_upload:
     cons_df = pd.read_csv(cons_upload, header=None, sep=None, engine="python")
     load = ensure_len(cons_df.iloc[:, 0].values, 8760)
@@ -452,7 +452,7 @@ m2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
 row1_col1, row1_col2 = st.columns(2)
 with row1_col1:
     st.markdown("#### ☀️ PV — Répartition")
-    fig, ax = plt.subplots(figsize=(2,2))  # réduit 50%
+    fig, ax = plt.subplots(figsize=(1.5,1.5))  # réduit 50%
     labels = ["Autoconso directe", "Vers batterie", "Export"]
     sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
