@@ -452,44 +452,33 @@ m2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
 row1_col1, row1_col2 = st.columns(2)
 with row1_col1:
     st.markdown("#### ☀️ PV — Répartition")
-    # --- Camembert PV (version stable & lisible & agrandie) ---
-    fig, ax = plt.subplots(figsize=(2.0,2.0), dpi=300)
+
+    fig, ax = plt.subplots(figsize=(2,2), dpi=300)
 
     labels = ["Autoconso directe", "Vers batterie", "Export"]
     sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
-    if sum(sizes) <= 0:
-        sizes = [1, 0, 0]
+    if sum(sizes) <= 0: sizes = [1,0,0]
     colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
 
-# Camembert
     wedges, texts, autotexts = ax.pie(
-    sizes,
-    labels=labels,
-    autopct=lambda p: f"{p:.0f}%",
-    startangle=90,
-    colors=colors,
-    radius=0.7   # <<< fixe la taille du camembert, indépendamment du texte
+        sizes,
+        labels=labels,
+        autopct=lambda p: f"{p:.0f}%" if p > 2 else "",
+        startangle=90,
+        colors=colors,
+        radius=0.8   # <<< taille du camembert (tu peux mettre 0.7 / 0.8 / 0.9)
     )
 
+    for t in texts:      t.set_fontsize(6)
+    for t in autotexts:  t.set_fontsize(6)
 
-# Taille & couleur des labels
-    for t in texts:
-        t.set_fontsize(6)
-        t.set_color(COLORS["text"])
-
-# Taille & couleur des pourcentages
-    for t in autotexts:
-        t.set_fontsize(6)
-        t.set_color(COLORS["text"])
-
-# Pas de titre
     ax.set_title("")
-    ax.axis('equal')
+    ax.set_aspect('equal', adjustable='datalim')
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
 
     svg = fig_to_svg(fig)
-
-# ✅ Taille réelle du camembert contrôlée ici (50% plus grand)
     st.image(svg, width=500)
+
 
 
 
