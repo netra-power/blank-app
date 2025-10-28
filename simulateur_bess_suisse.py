@@ -460,20 +460,32 @@ with row1_col1:
     if sum(sizes) <= 0: sizes = [1,0,0]
     colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
 
+    # -- Création du camembert
     wedges, texts, autotexts = ax.pie(
         sizes,
         labels=labels,
         autopct=lambda p: f"{p:.0f}%",
         startangle=90,
         colors=colors,
-        textprops={"color": COLORS["text"], "fontsize": 6}
+        textprops={"color": COLORS["text"]}   # taille ajustée ensuite
     )
 
-    for t in autotexts: t.set_fontsize(6)
-    for t in texts: t.set_fontsize(6)
+# -- Taille texte labels (légende sur les parts)
+    for t in texts:
+        t.set_fontsize(5)      # <<< Ajuste ici au besoin (5 = très propre + discret)
 
-    ax.set_title("Répartition de la production PV", color=COLORS["text"], fontsize=6)
+# -- Taille texte pourcentages
+    for t in autotexts:
+        t.set_fontsize(5)      # <<< même taille
+
+# -- Supprimer le titre
+    ax.set_title(None)
+
+# -- Optionnel (mais joli) : éviter aspect "ellipse"
+    ax.axis('equal')
+
     st.image(fig_to_svg(fig), use_container_width=True)
+
 
 
 
