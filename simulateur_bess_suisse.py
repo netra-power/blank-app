@@ -172,16 +172,16 @@ with st.sidebar:
     cons_upload = st.file_uploader("Importer profil conso (CSV)", type=["csv"])
     if cons_upload is None:
         building_kind = st.selectbox("Profil type", ["Résidentiel", "Tertiaire (bureaux)", "Industriel léger", "Industriel lourd"])
-        annual_kwh = st.number_input("Consommation annuelle (kWh)", min_value=0.0, value=50000.0, step=1000.0, format="%.0f")
+        annual_kwh = st.number_input("Consommation annuelle (kWh)", min_value=0.0, value=670000.0, step=1000.0, format="%.0f")
 
     has_pv = "PV" in system_type
     if has_pv:
         st.subheader("☀️ Photovoltaïque")
-        pv_kwc = st.number_input("Puissance installée (kWc)", min_value=0.0, value=100.0, step=1.0, format="%.0f")
-        pv_kva = st.number_input("Puissance apparente (kVA)", min_value=0.0, value=100.0, step=1.0, format="%.0f")
+        pv_kwc = st.number_input("Puissance installée (kWc)", min_value=0.0, value=275.0, step=1.0, format="%.0f")
+        pv_kva = st.number_input("Puissance apparente (kVA)", min_value=0.0, value=200.0, step=1.0, format="%.0f")
         st.markdown("> ⚙️ **Format CSV PV attendu :** 1 colonne, 8760 valeurs horaires (kWh/h), sans en-tête.")
         pv_upload = st.file_uploader("Importer profil PV (CSV)", type=["csv"])
-        pv_total_kwh = st.number_input("Production annuelle estimée (kWh)", min_value=0.0, value=100000.0, step=1000.0, format="%.0f")
+        pv_total_kwh = st.number_input("Production annuelle estimée (kWh)", min_value=0.0, value=300000.0, step=1000.0, format="%.0f")
     else:
         pv_kwc = pv_kva = pv_total_kwh = 0.0
         pv_upload = None
