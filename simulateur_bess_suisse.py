@@ -682,7 +682,7 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
     ls = load[load.index.month == 7]
     conso_summer = ls.groupby(ls.index.time).mean()
 
-    ps = pv_profile[pv_profile.index.month == 7]
+    ps = pv[pv.index.month == 7]
     pv_summer = ps.groupby(ps.index.time).mean()
 
     cs = bess_charge[bess_charge.index.month == 7]
@@ -695,7 +695,7 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
     lw = load[load.index.month == 12]
     conso_winter = lw.groupby(lw.index.time).mean()
 
-    pw = pv_profile[pv_profile.index.month == 12]
+    pw = pv[pv.index.month == 12]
     pv_winter = pw.groupby(pw.index.time).mean()
 
     cw = bess_charge[bess_charge.index.month == 12]
@@ -704,9 +704,8 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
     dw = bess_discharge[bess_discharge.index.month == 12]
     discharge_winter = dw.groupby(dw.index.time).mean()
 
-    # 🔄 Conversion des index pour tracé matplotlib
+    # 🔄 Convertir index -> datetime pour tracé Matplotlib
     import pandas as pd
-
     for s in [conso_summer, conso_winter, pv_summer, pv_winter, charge_summer, discharge_summer, charge_winter, discharge_winter]:
         s.index = pd.to_datetime(s.index.astype(str))
 
@@ -745,6 +744,7 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
     ax4.set_title("Flux batterie — Hiver (décembre)")
     ax4.legend()
     r4c2.pyplot(fig4)
+
 
 
 # ---------- Peak shaving annuel (si marché libre) ----------
