@@ -682,43 +682,37 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
     ls = load[load.index.month == 7]
     conso_summer = ls.groupby(ls.index.time).mean()
 
-    ps = pv[pv.index.month == 7]
+    ps = pv_profile[pv_profile.index.month == 7]
     pv_summer = ps.groupby(ps.index.time).mean()
 
-    cs = charged_s[charged_s.index.month == 7]
+    cs = bess_charge[bess_charge.index.month == 7]
     charge_summer = cs.groupby(cs.index.time).mean()
 
-    ds = discharged_s[discharged_s.index.month == 7]
+    ds = bess_discharge[bess_discharge.index.month == 7]
     discharge_summer = ds.groupby(ds.index.time).mean()
 
     # Hiver = Décembre
     lw = load[load.index.month == 12]
     conso_winter = lw.groupby(lw.index.time).mean()
 
-    # Conversion index → temps lisible pour tracé
-    conso_summer.index = pd.to_datetime(conso_summer.index.astype(str))
-    conso_winter.index = pd.to_datetime(conso_winter.index.astype(str))
-    pv_summer.index = pd.to_datetime(pv_summer.index.astype(str))
-    pv_winter.index = pd.to_datetime(pv_winter.index.astype(str))
-    charge_summer.index = pd.to_datetime(charge_summer.index.astype(str))
-    discharge_summer.index = pd.to_datetime(discharge_summer.index.astype(str))
-    charge_winter.index = pd.to_datetime(charge_winter.index.astype(str))
-    discharge_winter.index = pd.to_datetime(discharge_winter.index.astype(str))
-
-
-    pw = pv[pv.index.month == 12]
+    pw = pv_profile[pv_profile.index.month == 12]
     pv_winter = pw.groupby(pw.index.time).mean()
 
-    cw = charged_s[charged_s.index.month == 12]
+    cw = bess_charge[bess_charge.index.month == 12]
     charge_winter = cw.groupby(cw.index.time).mean()
 
-    dw = discharged_s[discharged_s.index.month == 12]
+    dw = bess_discharge[bess_discharge.index.month == 12]
     discharge_winter = dw.groupby(dw.index.time).mean()
 
-    # Affichage des 4 graphes
+    # 🔄 Conversion des index pour tracé matplotlib
+    import pandas as pd
+
+    for s in [conso_summer, conso_winter, pv_summer, pv_winter, charge_summer, discharge_summer, charge_winter, discharge_winter]:
+        s.index = pd.to_datetime(s.index.astype(str))
+
+    # --- Graphes Conso vs PV ---
     r3c1, r3c2 = st.columns(2)
 
-    # Conso vs PV Été
     fig, ax = plt.subplots(figsize=(8,3))
     ax.plot(conso_summer.index, conso_summer.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
     ax.plot(pv_summer.index, pv_summer.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
@@ -727,7 +721,6 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
     ax.legend()
     r3c1.pyplot(fig)
 
-    # Conso vs PV Hiver
     fig2, ax2 = plt.subplots(figsize=(8,3))
     ax2.plot(conso_winter.index, conso_winter.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
     ax2.plot(pv_winter.index, pv_winter.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
@@ -736,7 +729,7 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
     ax2.legend()
     r3c2.pyplot(fig2)
 
-    # Flux batterie Été vs Hiver
+    # --- Graphes Batterie ---
     r4c1, r4c2 = st.columns(2)
 
     fig3, ax3 = plt.subplots(figsize=(8,3))
@@ -753,47 +746,6 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
     ax4.legend()
     r4c2.pyplot(fig4)
 
-
-    # --- Conso vs PV ---
-    r3c1, r3c2 = st.columns(2)
-
-    for title, c, p, col in [
-        ("Été (moyenne juillet)", conso_summer, pv_summer, r3c1),
-        ("Hiver (moyenne décembre)", conso_winter, pv_winter, r3c2),
-    ]:
-        fig, ax = plt.subplots(figsize=(8,3))
-        ax.plot(c.index, c.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-        ax.plot(p.index, p.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
-        ax.fill_between(c.index, 0, np.minimum(c.values, p.values), alpha=0.18, hatch="//", color=COLORS["pv"], label="Autoconsommation")
-        ax.set_title(f"Conso vs PV — {title}", color=COLORS["text"])
-        ax.legend()
-        col.pyplot(fig)
-
-    # --- Flux batterie ---
-    r4c1, r4c2 = st.columns(2)
-    for title, ch, dis, col in [
-        ("Été (moyenne juillet)", charge_summer, discharge_summer, r4c1),
-        ("Hiver (moyenne décembre)", charge_winter, discharge_winter, r4c2),
-    ]:
-        fig2, ax2 = plt.subplots(figsize=(8,3))
-        ax2.bar(ch.index, ch.values, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.9)
-        ax2.bar(dis.index, -dis.values, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.9)
-        ax2.set_title(f"Flux batterie — {title}", color=COLORS["text"])
-        ax2.legend()
-        col.pyplot(fig2)
-
-
-    r4c1, r4c2 = st.columns(2)
-    for label, mask, col in [("Été (15 juillet)", mask_summer, r4c1), ("Hiver (15 janvier)", mask_winter, r4c2)]:
-        tday = load[mask].index
-        ch_day = charged_s[mask].values
-        dis_day = discharged_s[mask].values
-        fig2, ax2 = plt.subplots(figsize=(8,3))
-        ax2.bar(tday, ch_day, width=0.03, label="Charge (kWh/h)", color=COLORS["bess_charge"], alpha=0.9)
-        ax2.bar(tday, dis_day, width=0.03, label="Décharge (kWh/h)", color=COLORS["bess_discharge"], alpha=0.9)
-        ax2.set_title(f"Flux batterie — {label}", color=COLORS["text"])
-        ax2.legend()
-        col.pyplot(fig2)
 
 # ---------- Peak shaving annuel (si marché libre) ----------
 if ("bâtiment" in system_type.lower()) and (marche_libre == "Oui"):
