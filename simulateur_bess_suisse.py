@@ -678,18 +678,70 @@ with row2_col2:
 if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_kw > 0):
     st.markdown("### 📈 Profils — Profils moyens été / hiver")
 
-    # Profils MOYENS sur Juillet (été) & Décembre (hiver)
-    conso_summer = load[load.index.month == 7].groupby(load.index.time).mean()
-    conso_winter = load[load.index.month == 12].groupby(load.index.time).mean()
+    # Été = Juillet
+    ls = load[load.index.month == 7]
+    conso_summer = ls.groupby(ls.index.time).mean()
 
-    pv_summer = pv[pv.index.month == 7].groupby(pv.index.time).mean()
-    pv_winter = pv[pv.index.month == 12].groupby(pv.index.time).mean()
+    ps = pv[pv.index.month == 7]
+    pv_summer = ps.groupby(ps.index.time).mean()
 
-    charge_summer = charged_s[charged_s.index.month == 7].groupby(charged_s.index.time).mean()
-    discharge_summer = discharged_s[discharged_s.index.month == 7].groupby(discharged_s.index.time).mean()
+    cs = charged_s[charged_s.index.month == 7]
+    charge_summer = cs.groupby(cs.index.time).mean()
 
-    charge_winter = charged_s[charged_s.index.month == 12].groupby(charged_s.index.time).mean()
-    discharge_winter = discharged_s[discharged_s.index.month == 12].groupby(discharged_s.index.time).mean()
+    ds = discharged_s[discharged_s.index.month == 7]
+    discharge_summer = ds.groupby(ds.index.time).mean()
+
+    # Hiver = Décembre
+    lw = load[load.index.month == 12]
+    conso_winter = lw.groupby(lw.index.time).mean()
+
+    pw = pv[pv.index.month == 12]
+    pv_winter = pw.groupby(pw.index.time).mean()
+
+    cw = charged_s[charged_s.index.month == 12]
+    charge_winter = cw.groupby(cw.index.time).mean()
+
+    dw = discharged_s[discharged_s.index.month == 12]
+    discharge_winter = dw.groupby(dw.index.time).mean()
+
+    # Affichage des 4 graphes
+    r3c1, r3c2 = st.columns(2)
+
+    # Conso vs PV Été
+    fig, ax = plt.subplots(figsize=(8,3))
+    ax.plot(conso_summer.index, conso_summer.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+    ax.plot(pv_summer.index, pv_summer.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
+    ax.fill_between(conso_summer.index, 0, np.minimum(conso_summer.values, pv_summer.values), alpha=0.18, color=COLORS["pv"])
+    ax.set_title("Été — Profil moyen (juillet)")
+    ax.legend()
+    r3c1.pyplot(fig)
+
+    # Conso vs PV Hiver
+    fig2, ax2 = plt.subplots(figsize=(8,3))
+    ax2.plot(conso_winter.index, conso_winter.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+    ax2.plot(pv_winter.index, pv_winter.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
+    ax2.fill_between(conso_winter.index, 0, np.minimum(conso_winter.values, pv_winter.values), alpha=0.18, color=COLORS["pv"])
+    ax2.set_title("Hiver — Profil moyen (décembre)")
+    ax2.legend()
+    r3c2.pyplot(fig2)
+
+    # Flux batterie Été vs Hiver
+    r4c1, r4c2 = st.columns(2)
+
+    fig3, ax3 = plt.subplots(figsize=(8,3))
+    ax3.bar(charge_summer.index, charge_summer.values, color=COLORS["bess_charge"], alpha=0.8, label="Charge (kW)")
+    ax3.bar(discharge_summer.index, -discharge_summer.values, color=COLORS["bess_discharge"], alpha=0.8, label="Décharge (kW)")
+    ax3.set_title("Flux batterie — Été (juillet)")
+    ax3.legend()
+    r4c1.pyplot(fig3)
+
+    fig4, ax4 = plt.subplots(figsize=(8,3))
+    ax4.bar(charge_winter.index, charge_winter.values, color=COLORS["bess_charge"], alpha=0.8, label="Charge (kW)")
+    ax4.bar(discharge_winter.index, -discharge_winter.values, color=COLORS["bess_discharge"], alpha=0.8, label="Décharge (kW)")
+    ax4.set_title("Flux batterie — Hiver (décembre)")
+    ax4.legend()
+    r4c2.pyplot(fig4)
+
 
     # --- Conso vs PV ---
     r3c1, r3c2 = st.columns(2)
