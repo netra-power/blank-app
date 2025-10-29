@@ -236,6 +236,16 @@ with st.sidebar:
         # ✅ Mise sur grille 15 min uniforme
         idx_15m = pd.date_range(consum_kW.index.min(), consum_kW.index.max(), freq="15T")
         consum_kW = consum_kW.reindex(idx_15m, method="nearest")
+        
+        # ✅ Calcul consommation annuelle réelle à partir du profil importé
+        annual_kwh_from_csv = (consum_kW * 0.25).sum()
+
+        st.metric(
+            label="Consommation annuelle (profil importé)",
+            value=f"{annual_kwh_from_csv:,.0f} kWh",
+            help="Somme puissance(kW) × 0.25 h sur l'année"
+        )
+
 
     else:
         st.info("ℹ️ Aucun fichier importé — saisissez un profil type ci-dessous.")
