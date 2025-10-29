@@ -195,12 +195,14 @@ with st.sidebar:
         elif unit_clean in ["(kwh)", "kwh"]:
             st.success("✅ Profil importé en énergie (kWh) → conversion en kW")
             df = df.sort_values("DateHeure")
-            dt = (df["DateHeure"].shift(-1) - df["DateHeure"]).dt.total_seconds() / 3600
-            consum_KW = df["Consommation"] / dt
+
+        # ✅ Conversion kWh 15 min → kW
+            consum_KW = df["Consommation"].astype(float) * 4
             consum_KW.index = df["DateHeure"]
 
-# ✅ Toujours créer la variable standard consum_kW
+        # ✅ Standardiser le nom de la série
             consum_kW = consum_KW.rename("Consommation_kW")
+
 
     
         else:
