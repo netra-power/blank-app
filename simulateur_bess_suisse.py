@@ -672,6 +672,12 @@ with row2_col2:
     svg = fig_to_svg(fig)
     st.image(svg, width=500)
 
+# PV toujours en kW sur index horaire
+if pv_upload is not None:
+    pv = pv_kW  # issu du CSV
+else:
+    pv = pv_gen  # profil synthétique existant
+
 
 # -------------------------------------------------------------
 # 📈 Profils — Profils moyens été / hiver (Juillet & Janvier)
@@ -682,8 +688,9 @@ st.markdown("## 📈 Profils — Profils moyens été / hiver")
 summer = load[load.index.month == 7]
 winter = load[load.index.month == 1]
 
-pv_summer = pv_profile[pv_profile.index.month == 7]
-pv_winter = pv_profile[pv_profile.index.month == 1]
+pv_summer = pv[pv.index.month == 7]
+pv_winter = pv[pv.index.month == 1]
+
 
 charge_summer = charged_s[charged_s.index.month == 7]
 discharge_summer = discharged_s[discharged_s.index.month == 7]
