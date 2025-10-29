@@ -742,7 +742,9 @@ axes[1,1].set_title("Flux batterie — Hiver (21 décembre)")
 format_time_axis(axes[1,1])
 axes[1,1].legend()
 
-st.pyplot(fig)
+fig.set_dpi(300)
+st.image(fig_to_svg(fig), use_container_width=True)
+
 
 
 
