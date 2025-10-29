@@ -467,15 +467,23 @@ with row1_col1:
         autopct=lambda p: f"{p:.0f}%",
         startangle=90,
         colors=colors,
-        radius=0.8   # <<< taille du camembert (tu peux mettre 0.7 / 0.8 / 0.9)
+        radius=0.8,
+        labeldistance=0.88,   # ← labels tirés vers l'intérieur
+        pctdistance=0.62      # ← % un peu plus centrés
     )
 
-    for t in texts:      t.set_fontsize(6)
-    for t in autotexts:  t.set_fontsize(6)
+
+    for t in texts:      
+        t.set_fontsize(6)
+        t.set_clip_on(False)  # ← évite la coupe au bord de l’axe
+    for t in autotexts:
+        t.set_fontsize(6)
+        t.set_clip_on(False)
+
 
     ax.set_title("")
     ax.set_aspect('equal', adjustable='datalim')
-    fig.subplots_adjust(left=0.12, right=0.88, top=0.88, bottom=0.12)
+    fig.subplots_adjust(left=0.10, right=0.90, top=0.90, bottom=0.12)
 
 
     svg = fig_to_svg(fig)
