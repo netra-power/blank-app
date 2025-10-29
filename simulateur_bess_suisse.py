@@ -451,7 +451,7 @@ m2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
 # ---------- Ligne 1 (2x2) : PV split + Autoconso table ----------
 row1_col1, row1_col2 = st.columns(2)
 with row1_col1:
-    st.markdown("#### ☀️ PV — Répartition")
+    st.markdown("#### ☀️ Répartition de production PV")
 
     fig, ax = plt.subplots(figsize=(2,2), dpi=300)
 
@@ -479,11 +479,6 @@ with row1_col1:
     svg = fig_to_svg(fig)
     st.image(svg, width=500)
 
-
-
-
-
-
 with row1_col2:
     st.markdown("#### 🏢 Autoconsommation du bâtiment")
     ac_df = pd.DataFrame({
@@ -495,7 +490,7 @@ with row1_col2:
 # ---------- Ligne 2 (2x2) : Sources d'énergie sans/avec BESS ----------
 row2_col1, row2_col2 = st.columns(2)
 with row2_col1:
-    st.markdown("#### 🔌 Sources d'énergie — Sans batterie")
+    st.markdown("#### 🔌 Sources d'énergie du bâtiment — PV seul")
 
     fig, ax = plt.subplots(figsize=(2,2), dpi=300)
 
@@ -528,7 +523,7 @@ with row2_col1:
 
 
 with row2_col2:
-    st.markdown("#### 🔋 Sources d'énergie — Avec batterie")
+    st.markdown("#### 🔋 Sources d'énergie du bâtiment — PV + BESS")
 
     fig, ax = plt.subplots(figsize=(2,2), dpi=300)
 
