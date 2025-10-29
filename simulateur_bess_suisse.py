@@ -213,7 +213,7 @@ with st.sidebar:
 
         annual_kwh = st.number_input(
             "Consommation annuelle (kWh/an)",
-            min_value=100.0, max_value=10_000_000.0, value=100_000.0
+            min_value=100.0, max_value=10_000_000.0, value=670_000.0
         )
 
         consum_kW = build_consumption_profile(building_kind, annual_kwh, start_year=2024)
