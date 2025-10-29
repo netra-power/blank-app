@@ -176,7 +176,7 @@ with st.sidebar:
     if cons_upload is not None:
         import pandas as pd
 
-        df = pd.read_excel(cons_upload)
+        df = pd.read_excel(cons_upload, engine="openpyxl")
 
     # Vérification structure minimale
         if df.columns[0] != "DateHeure" or df.columns[1] != "Consommation":
