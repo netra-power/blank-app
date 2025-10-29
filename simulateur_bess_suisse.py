@@ -481,25 +481,22 @@ with row1_col1:
 
 with row1_col2:
     st.markdown("#### 🏢 Autoconsommation du bâtiment")
+
     ac_df = pd.DataFrame({
         "Scénario": ["PV sans BESS", "PV avec BESS"],
         "Autoconsommation (%)": [autoconso_no_bess, autoconso_with_bess]
     })
-    ac_df = pd.DataFrame({
-    "Scénario": ["PV sans BESS", "PV avec BESS"],
-    "Autoconsommation (%)": [autoconso_no_bess, autoconso_with_bess]
-    })
 
-    st.data_editor(
-        ac_df,
+    # Formater proprement les % + centrer
+    ac_df["Autoconsommation (%)"] = ac_df["Autoconsommation (%)"].round(0).astype(int).astype(str) + " %"
+
+    st.dataframe(
+        ac_df.style.set_properties(
+            subset=["Autoconsommation (%)"],
+            **{"text-align": "center"}
+        ),
         hide_index=True,
-        use_container_width=True,
-        column_config={
-            "Autoconsommation (%)": st.column_config.NumberColumn(
-                format="%.0f %%",
-                align="center"   # ← centre la valeur
-            )
-        }
+        use_container_width=True
     )
 
 
