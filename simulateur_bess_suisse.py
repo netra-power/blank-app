@@ -290,10 +290,12 @@ with st.sidebar:
 # -----------------------------
 idx = year_hours(2024)
 
-# Si un fichier CSV a été importé (consum_kW déjà calculé dans la sidebar)
-if cons_upload is not None:
-    st.success("✅ Profil de consommation chargé depuis le fichier CSV")
-    load = consum_kW.reindex(idx, method="nearest")
+# ✅ Toujours utiliser consum_kW (qu'il vienne du CSV ou du profil synthétique)
+load = consum_kW.copy()
+
+# ✅ Harmonisation du pas de temps sur l’année complète
+load = load.reindex(idx, method="nearest")
+
 
 # Sinon → profil synthétique comme avant
 else:
