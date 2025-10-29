@@ -455,7 +455,7 @@ with row1_col1:
 
     fig, ax = plt.subplots(figsize=(2,2), dpi=300)
 
-    labels = ["Autoconso directe", "Vers batterie", "Export"]
+    labels = ["Autoconsommation", "Vers batterie", "Export"]
     sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
     colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
@@ -463,7 +463,7 @@ with row1_col1:
     wedges, texts, autotexts = ax.pie(
         sizes,
         labels=labels,
-        autopct=lambda p: f"{p:.0f}%" if p > 2 else "",
+        autopct=lambda p: f"{p:.0f}%",
         startangle=90,
         colors=colors,
         radius=0.8   # <<< taille du camembert (tu peux mettre 0.7 / 0.8 / 0.9)
@@ -485,7 +485,23 @@ with row1_col2:
         "Scénario": ["PV sans BESS", "PV avec BESS"],
         "Autoconsommation (%)": [autoconso_no_bess, autoconso_with_bess]
     })
-    st.dataframe(ac_df.style.format({"Autoconsommation (%)": "{:,.0f}"}), use_container_width=False)
+    ac_df = pd.DataFrame({
+    "Scénario": ["PV sans BESS", "PV avec BESS"],
+    "Autoconsommation (%)": [autoconso_no_bess, autoconso_with_bess]
+    })
+
+    st.data_editor(
+        ac_df,
+        hide_index=True,
+        use_container_width=True,
+        column_config={
+            "Autoconsommation (%)": st.column_config.NumberColumn(
+                format="%.0f %%",
+                align="center"   # ← centre la valeur
+            )
+        }
+    )
+
 
 # ---------- Ligne 2 (2x2) : Sources d'énergie sans/avec BESS ----------
 row2_col1, row2_col2 = st.columns(2)
@@ -503,7 +519,7 @@ with row2_col1:
     wedges, texts, autotexts = ax.pie(
         sizes,
         labels=labels,
-        autopct=lambda p: f"{p:.0f}%" if p > 2 else "",
+        autopct=lambda p: f"{p:.0f}%",
         startangle=90,
         colors=colors,
         radius=0.8
@@ -536,7 +552,7 @@ with row2_col2:
     wedges, texts, autotexts = ax.pie(
         sizes,
         labels=labels,
-        autopct=lambda p: f"{p:.0f}%" if p > 2 else "",
+        autopct=lambda p: f"{p:.0f}%",
         startangle=90,
         colors=colors,
         radius=0.8
