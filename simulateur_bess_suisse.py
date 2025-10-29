@@ -257,13 +257,18 @@ with st.sidebar:
 # -----------------------------
 # Profils (conso & PV)
 # -----------------------------
+
 idx = year_hours(2024)
-if cons_upload:
-    cons_df = pd.read_csv(cons_upload, header=None, sep=None, engine="python")
-    load = ensure_len(cons_df.iloc[:, 0].values, 8760)
-    load = pd.Series(load, index=idx)
+
+# ⚠️ On utilise consum_kW calculé dans la sidebar
+#    (fichier CSV OU profil synthétique)
+if "consum_KW" in locals() or "consum_kW" in locals():
+    load = consum_kW.reindex(idx, method="nearest")
 else:
-    load = build_consumption_profile(building_kind, annual_kwh, start_year=2024)
+    # Cas où aucune donnée n'est définie (sécurité)
+    st.error("Aucun profil de consommation disponible. Importez un fichier ou saisissez un profil.")
+    st.stop()
+
 
 if has_pv:
     if pv_upload:
