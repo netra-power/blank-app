@@ -169,52 +169,57 @@ with st.sidebar:
     eur_chf = st.number_input("Taux EUR→CHF", min_value=0.5, max_value=2.0, value=1.0, step=0.01)
 
     st.subheader("📊 Bâtiment — Consommation")
-    st.markdown("📂 Import du profil de consommation bâtiment (.xlsx)")
+    st.markdown("### 📂 Profil de consommation du bâtiment")
 
-    cons_upload = st.file_uploader("Importer profil conso (CSV)", type=["csv"])
+    cons_upload = st.file_uploader("Importer un fichier CSV de consommation (optionnel)", type=["csv"])
 
     if cons_upload is not None:
         import pandas as pd
 
-    # ✅ Lecture robuste CSV FR (séparateur point-virgule)
         df = pd.read_csv(cons_upload, sep=";", header=None, dtype=str)
-
-    # Ligne 1 : en-têtes
         df.columns = ["DateHeure", "Consommation"]
 
-    # Ligne 2 = Unité
         unit = df.iloc[1,1].strip()
-
-    # On supprime la ligne avec l’unité, on garde les données
         df = df.iloc[2:].copy()
 
-    # ✅ Conversion date et heure (format français : jj.mm.aaaa hh:mm)
         df["DateHeure"] = pd.to_datetime(df["DateHeure"], format="%d.%m.%Y %H:%M", errors="coerce")
+        df["Consommation"] = df["Consommation"].str.replace(",", ".", regex=False).astype(float)
 
-    # ✅ Conversion virgules → points → float
-        df["Consommation"] = (
-            df["Consommation"]
-            .str.replace(",", ".", regex=False)
-            .astype(float)
-        )
-
-    # ✅ Interprétation selon l’unité B2
         unit_clean = unit.lower().replace(" ", "")
-    
+
         if unit_clean in ["(kw)", "kw"]:
-            st.write("🔍 Profil interprété comme **Puissance (kW)**")
+            st.success("✅ Profil importé en puissance (kW)")
             consum_kW = df.set_index("DateHeure")["Consommation"]
 
         elif unit_clean in ["(kwh)", "kwh"]:
-            st.write("🔍 Profil interprété comme **Énergie par intervalle (kWh)**")
+            st.success("✅ Profil importé en énergie (kWh) → conversion en kW")
             df = df.sort_values("DateHeure")
             dt = (df["DateHeure"].shift(-1) - df["DateHeure"]).dt.total_seconds() / 3600
-            consum_kW = df["Consommation"] / dt
-            consum_kW.index = df["DateHeure"]
+            consum_KW = df["Consommation"] / dt
+            consum_KW.index = df["DateHeure"]
+            consum_kW = consum_KW.copy()
 
         else:
-            st.error("⚠️ L'unité dans la cellule B2 doit être `(kW)` ou `(kWh)`.")
+            st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
             st.stop()
+
+    else:
+        st.info("ℹ️ Aucun fichier importé — saisissez un profil type ci-dessous.")
+
+        building_kind = st.selectbox(
+            "Type de bâtiment",
+            ["Résidentiel", "Tertiaire", "Industriel"]
+        )
+
+        annual_kwh = st.number_input(
+            "Consommation annuelle (kWh/an)",
+            min_value=100.0, max_value=10_000_000.0, value=100_000.0
+        )
+
+        consum_kW = build_consumption_profile(building_kind, annual_kwh, start_year=2024)
+
+
+    
 
 
 
