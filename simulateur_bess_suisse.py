@@ -307,8 +307,17 @@ load = consum_kW.copy()
 load = load.sort_index()
 load = load[~load.index.duplicated(keep="first")]
 
-# ✅ Puis seulement maintenant → reindex sur la grille 15 min
+# --- Sécurisation du profil avant recalage ---
+# (tri, suppression doublons, nettoyage, obligatoire)
+load = load.sort_index()
+load = load[load.index.notna()]
+load = load[~load.index.duplicated(keep="first")]
+
+# --- Mise sur grille annuelle 15 min ---
+idx = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
 load = load.reindex(idx, method="nearest")
+load.name = "Consommation_kW"
+
 
 
 
