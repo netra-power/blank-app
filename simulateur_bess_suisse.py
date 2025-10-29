@@ -698,6 +698,15 @@ discharge_day_summer = discharged_s[mask_summer]
 charge_day_winter = charged_s[mask_winter]
 discharge_day_winter = discharged_s[mask_winter]
 
+# Conversion des flux batterie de kW → kWh (pas de temps = 15 min = 0.25 h)
+dt = 0.25  # si pas de temps = 15 minutes
+charge_day_summer_kwh = charge_day_summer * dt
+discharge_day_summer_kwh = discharge_day_summer * dt
+
+charge_day_winter_kwh = charge_day_winter * dt
+discharge_day_winter_kwh = discharge_day_winter * dt
+
+
 # Conversion index → heures (0 → 24)
 import numpy as np
 def to_hours(series):
@@ -717,30 +726,44 @@ fig, axes = plt.subplots(2, 2, figsize=(12, 7), dpi=150)
 # Été - Conso & PV
 axes[0,0].plot(x_summer, conso_day_summer, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
 axes[0,0].plot(x_summer, pv_day_summer, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
+
+# Zone d’autoconsommation (hachurée)
+axes[0,0].fill_between(x_summer,
+                       0,
+                       np.minimum(conso_day_summer, pv_day_summer),
+                       color=COLORS["pv"], alpha=0.25,
+                       hatch="///", edgecolor=COLORS["pv"])
+
 axes[0,0].set_title("Été — 21 juin")
 format_time_axis(axes[0,0])
 axes[0,0].legend()
 
+
 # Hiver - Conso & PV
 axes[0,1].plot(x_winter, conso_day_winter, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
 axes[0,1].plot(x_winter, pv_day_winter, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
+
+# Zone autoconsommée (hachurée)
+axes[0,1].fill_between(x_winter,
+                       0,
+                       np.minimum(conso_day_winter, pv_day_winter),
+                       color=COLORS["pv"], alpha=0.25,
+                       hatch="///", edgecolor=COLORS["pv"])
+
 axes[0,1].set_title("Hiver — 21 décembre")
 format_time_axis(axes[0,1])
 axes[0,1].legend()
 
+
 # Été - Batterie
-axes[1,0].bar(x_summer, charge_day_summer, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
-axes[1,0].bar(x_summer, -discharge_day_summer, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
-axes[1,0].set_title("Flux batterie — Été (21 juin)")
-format_time_axis(axes[1,0])
-axes[1,0].legend()
+axes[1,0].bar(x_summer, charge_day_summer_kwh, label="Charge (kWh)", color=COLORS["bess_charge"], alpha=0.6)
+axes[1,0].bar(x_summer, -discharge_day_summer_kwh, label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.6)
+
 
 # Hiver - Batterie
-axes[1,1].bar(x_winter, charge_day_winter, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
-axes[1,1].bar(x_winter, -discharge_day_winter, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
-axes[1,1].set_title("Flux batterie — Hiver (21 décembre)")
-format_time_axis(axes[1,1])
-axes[1,1].legend()
+axes[1,1].bar(x_winter, charge_day_winter_kwh, label="Charge (kWh)", color=COLORS["bess_charge"], alpha=0.6)
+axes[1,1].bar(x_winter, -discharge_day_winter_kwh, label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.6)
+
 
 fig.set_dpi(300)
 st.image(fig_to_svg(fig), use_container_width=True)
