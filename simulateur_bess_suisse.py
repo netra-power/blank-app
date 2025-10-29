@@ -202,8 +202,6 @@ with st.sidebar:
 
         # ✅ Standardiser le nom de la série
             consum_kW = consum_KW.rename("Consommation_kW")
-
-
     
         else:
             st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
@@ -253,12 +251,6 @@ with st.sidebar:
         )
 
         consum_kW = build_consumption_profile(building_kind, annual_kwh, start_year=2024)
-
-
-    
-
-
-
 
 
     has_pv = "PV" in system_type
