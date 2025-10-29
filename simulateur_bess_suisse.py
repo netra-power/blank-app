@@ -188,7 +188,7 @@ with st.sidebar:
         df = df.iloc[2:].copy()  # Enlève ligne unité
 
     # Conversion du champ date
-        df["DateHeure"] = pd.to_datetime(df["DateHeure"])
+        df["DateHeure"] = pd.to_datetime(df["DateHeure"], format="%d.%m.%Y %H:%M", errors="coerce")
 
     # Conversion consommation (gestion des virgules → points)
         df["Consommation"] = (
