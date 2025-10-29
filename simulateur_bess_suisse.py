@@ -695,6 +695,17 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
     lw = load[load.index.month == 12]
     conso_winter = lw.groupby(lw.index.time).mean()
 
+    # Conversion index → temps lisible pour tracé
+    conso_summer.index = pd.to_datetime(conso_summer.index.astype(str))
+    conso_winter.index = pd.to_datetime(conso_winter.index.astype(str))
+    pv_summer.index = pd.to_datetime(pv_summer.index.astype(str))
+    pv_winter.index = pd.to_datetime(pv_winter.index.astype(str))
+    charge_summer.index = pd.to_datetime(charge_summer.index.astype(str))
+    discharge_summer.index = pd.to_datetime(discharge_summer.index.astype(str))
+    charge_winter.index = pd.to_datetime(charge_winter.index.astype(str))
+    discharge_winter.index = pd.to_datetime(discharge_winter.index.astype(str))
+
+
     pw = pv[pv.index.month == 12]
     pv_winter = pw.groupby(pw.index.time).mean()
 
