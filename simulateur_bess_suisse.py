@@ -318,6 +318,8 @@ idx = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
 load = load.reindex(idx, method="nearest")
 load.name = "Consommation_kW"
 
+# ✅ Assurer cohérence de résolution PV = conso
+pv = pv.reindex(idx, method="nearest")
 
 
 
@@ -348,6 +350,20 @@ if marche_libre == "Oui":
         prices = pd.Series(0.12 + 0.03*np.sin(2*np.pi*(t%24)/24), index=idx)
 else:
     prices = pd.Series(np.full(len(idx), price_buy_fixed), index=idx)
+
+# --- Harmonisation des profils sur la grille 15 min annuelle ---
+idx = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
+
+load = load.sort_index()
+load = load[~load.index.duplicated(keep="first")]
+load = load.reindex(idx, method="nearest")
+
+pv = pv.sort_index()
+pv = pv[~pv.index.duplicated(keep="first")]
+pv = pv.reindex(idx, method="nearest")
+
+prices = prices.sort_index()
+prices = prices.reindex(idx, method="nearest")
 
 
 # -----------------------------
