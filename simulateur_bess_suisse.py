@@ -496,23 +496,35 @@ with row1_col2:
 row2_col1, row2_col2 = st.columns(2)
 with row2_col1:
     st.markdown("#### 🔌 Sources d'énergie — Sans batterie")
-    fig, ax = plt.subplots(figsize=(2,2))  # réduit 50%
-    fig.set_dpi(300)   # ← Haute résolution
+
+    fig, ax = plt.subplots(figsize=(2,2), dpi=300)
+
     labels = ["PV direct", "BESS", "Réseau (import)"]
     sizes = [pv_self_no_bess.sum(), 0.0, grid_to_load_no_bess.sum()]
-    if sum(sizes) <= 0: sizes = [1,0,0]
+    if sum(sizes) <= 0:
+        sizes = [1, 0, 0]
     colors = [COLORS["pv"], COLORS["bess_discharge"], COLORS["grid_import"]]
-    ax.pie(
-    sizes,
-    labels=labels,
-    autopct=lambda p: f"{p:.0f}%",
-    startangle=90,
-    colors=colors,
-    textprops={"color": COLORS["text"], "fontsize": 6},   # ← Texte plus petit
+
+    wedges, texts, autotexts = ax.pie(
+        sizes,
+        labels=labels,
+        autopct=lambda p: f"{p:.0f}%" if p > 2 else "",
+        startangle=90,
+        colors=colors,
+        radius=0.8
     )
 
-    ax.set_title("Sans batterie", color=COLORS["text"])
-    st.image(fig_to_svg(fig), use_container_width=True)
+    for t in texts:
+        t.set_fontsize(6)
+    for t in autotexts:
+        t.set_fontsize(6)
+
+    ax.set_title("")
+    ax.set_aspect('equal', adjustable='datalim')
+    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+
+    svg = fig_to_svg(fig)
+    st.image(svg, width=500)
 
 
 with row2_col2:
