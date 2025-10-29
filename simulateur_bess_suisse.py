@@ -199,6 +199,33 @@ with st.sidebar:
             consum_KW.index = df["DateHeure"]
             consum_kW = consum_KW.copy()
 
+    # ✅ Tri + suppression de doublons (pas obligatoire, mais évite les crash)
+        consum_kW = consum_kW.sort_index()
+        consum_kW = consum_kW[~consum_kW.index.duplicated(keep="first")]
+
+    # ✅ Détection automatique du pas de temps
+        dt_seconds = (
+            consum_kW.index.to_series()
+            .diff()
+            .dropna()
+            .dt.total_seconds()
+            .mode()[0]   # mode = intervalle dominant
+        )
+
+        if dt_seconds == 900:
+            st.info("⏱️ Pas de temps détecté : **15 minutes** ✅ (pas de conversion)")
+        elif dt_seconds == 1800:
+            st.warning("⏱️ Pas de temps détecté : **30 minutes** → conversion en 15 min")
+        elif dt_seconds == 3600:
+            st.warning("⏱️ Pas de temps détecté : **1 heure** → conversion en 15 min")
+        else:
+            st.warning(f"⏱️ Pas de temps irrégulier ({int(dt_seconds)} s) → conversion en standard 15 min")
+
+    # ✅ Normalisation sur une grille annuelle 15 min
+        idx_15m = pd.date_range(consum_kW.index.min(), consum_kW.index.max(), freq="15T")
+        consum_kW = consum_kW.reindex(idx_15m, method="nearest")
+
+
         else:
             st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
             st.stop()
