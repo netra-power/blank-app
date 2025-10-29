@@ -689,6 +689,15 @@ mask_winter = day_slice("2024-12-21")
 conso_day_summer = load[mask_summer]
 conso_day_winter = load[mask_winter]
 
+# Soutirage réseau = Conso - PV - Décharge + Charge
+grid_summer = conso_day_summer - pv_day_summer - discharge_day_summer + charge_day_summer
+grid_winter = conso_day_winter - pv_day_winter - discharge_day_winter + charge_day_winter
+
+# Pas de valeurs négatives → sinon ce serait injection
+grid_summer = grid_summer.clip(lower=0)
+grid_winter = grid_winter.clip(lower=0)
+
+
 pv_day_summer = pv[mask_summer]
 pv_day_winter = pv[mask_winter]
 
@@ -726,30 +735,30 @@ fig, axes = plt.subplots(2, 2, figsize=(12, 7), dpi=150)
 # Été - Conso & PV
 axes[0,0].plot(x_summer, conso_day_summer, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
 axes[0,0].plot(x_summer, pv_day_summer, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
+axes[0,0].plot(x_summer, grid_summer, label="Réseau (kW)", color=COLORS["grid"], linestyle="--", linewidth=1.8)
 
-# Zone d’autoconsommation (hachurée)
+# Zone autoconsommée (hachurée)
 axes[0,0].fill_between(x_summer,
                        0,
                        np.minimum(conso_day_summer, pv_day_summer),
                        color=COLORS["pv"], alpha=0.25,
                        hatch="///", edgecolor=COLORS["pv"])
-
 axes[0,0].set_title("Été — 21 juin")
 format_time_axis(axes[0,0])
 axes[0,0].legend()
 
 
+
 # Hiver - Conso & PV
 axes[0,1].plot(x_winter, conso_day_winter, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
 axes[0,1].plot(x_winter, pv_day_winter, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
+axes[0,1].plot(x_winter, grid_winter, label="Réseau (kW)", color=COLORS["grid"], linestyle="--", linewidth=1.8)
 
-# Zone autoconsommée (hachurée)
 axes[0,1].fill_between(x_winter,
                        0,
                        np.minimum(conso_day_winter, pv_day_winter),
                        color=COLORS["pv"], alpha=0.25,
                        hatch="///", edgecolor=COLORS["pv"])
-
 axes[0,1].set_title("Hiver — 21 décembre")
 format_time_axis(axes[0,1])
 axes[0,1].legend()
