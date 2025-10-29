@@ -178,19 +178,17 @@ with st.sidebar:
 
         df = pd.read_excel(cons_upload, engine="openpyxl")
 
-    # Vérification structure minimale
         if df.columns[0] != "DateHeure" or df.columns[1] != "Consommation":
             st.error("⚠️ Le fichier doit contenir les colonnes 'DateHeure' et 'Consommation'.")
             st.stop()
 
-    # Lecture unité en B2 (peut être `(kW)` ou `(kWh)`)
         unit = str(df.iloc[1,1]).strip()
-        df = df.iloc[2:].copy()  # Enlève ligne unité
+        df = df.iloc[2:].copy()
 
-    # Conversion du champ date
+    # ✅ Conversion date heure au format jj.mm.aaaa hh:mm
         df["DateHeure"] = pd.to_datetime(df["DateHeure"], format="%d.%m.%Y %H:%M", errors="coerce")
 
-    # Conversion consommation (gestion des virgules → points)
+    # ✅ Conversion virgules → points
         df["Consommation"] = (
             df["Consommation"]
             .astype(str)
@@ -198,13 +196,12 @@ with st.sidebar:
             .astype(float)
         )
 
-    # Interprétation selon l’unité
         if unit.lower().replace(" ", "") in ["(kw)", "kw"]:
             st.write("🔍 Unité détectée : **Puissance (kW)**")
             consum_kW = df.set_index("DateHeure")["Consommation"]
 
         elif unit.lower().replace(" ", "") in ["(kwh)", "kwh"]:
-            st.write("🔍 Unité détectée : **Énergie par intervalle (kWh)**")
+            st.write("🔍 Unité détectée : **Énergie par pas (kWh)**")
             df = df.sort_values("DateHeure")
             dt = (df["DateHeure"].iloc[1] - df["DateHeure"].iloc[0]).total_seconds() / 3600
             consum_kW = df["Consommation"] / dt
@@ -214,9 +211,6 @@ with st.sidebar:
             st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
             st.stop()
 
-    else:
-        st.warning("📄 Merci de charger un fichier de consommation (.xlsx)")
-        st.stop()
 
 
     has_pv = "PV" in system_type
