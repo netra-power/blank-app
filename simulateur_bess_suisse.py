@@ -16,8 +16,9 @@ import base64
 
 def fig_to_svg(fig):
     buf = BytesIO()
-    fig.savefig(buf, format="svg", bbox_inches="tight")
+    fig.savefig(buf, format="svg", dpi=300)   # ← on retire bbox_inches="tight"
     return buf.getvalue().decode("utf-8")
+
 
 
 
