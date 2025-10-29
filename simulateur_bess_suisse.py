@@ -685,10 +685,10 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
     ps = pv[pv.index.month == 7]
     pv_summer = ps.groupby(ps.index.time).mean()
 
-    cs = bess_charge[bess_charge.index.month == 7]
+    cs = charged_s[charged_s.index.month == 7]
     charge_summer = cs.groupby(cs.index.time).mean()
 
-    ds = bess_discharge[bess_discharge.index.month == 7]
+    ds = discharged_s[discharged_s.index.month == 7]
     discharge_summer = ds.groupby(ds.index.time).mean()
 
     # Hiver = Décembre
@@ -698,10 +698,10 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
     pw = pv[pv.index.month == 12]
     pv_winter = pw.groupby(pw.index.time).mean()
 
-    cw = bess_charge[bess_charge.index.month == 12]
+    cw = charged_s[charged_s.index.month == 12]
     charge_winter = cw.groupby(cw.index.time).mean()
 
-    dw = bess_discharge[bess_discharge.index.month == 12]
+    dw = discharged_s[discharged_s.index.month == 12]
     discharge_winter = dw.groupby(dw.index.time).mean()
 
     # 🔄 Convertir index -> datetime pour tracé Matplotlib
