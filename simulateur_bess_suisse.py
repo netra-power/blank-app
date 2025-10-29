@@ -207,18 +207,24 @@ with st.sidebar:
             st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
             st.stop()
     
-        # ✅ Tri + suppression des doublons
-        consum_kW = consum_kW.sort_index()
-        consum_kW = consum_kW[~consum_kW.index.duplicated(keep="first")]
-        consum_kW = consum_kW[consum_kW.index.notna()]
-        consum_kW = consum_kW.astype(float)
-        
-        # ✅ Normalisation de l’année → on conserve MOIS/JOUR/HEURE/MINUTE
-        consum_kW.index = consum_kW.index.map(lambda t: t.replace(year=2024))
-        
-        # ✅ Mise sur grille uniforme 15 min sur toute l'année 2024
-        idx_15m = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
-        consum_kW = consum_kW.reindex(idx_15m, method="nearest")
+            # ✅ Tri + nettoyage
+            consum_kW = consum_kW.sort_index()
+            consum_kW = consum_kW[consum_kW.index.notna()]
+            consum_kW = consum_kW.astype(float)
+            
+            # ✅ Reprojection de toutes les dates sur 2024 (en conservant saison + heures)
+            consum_kW.index = consum_kW.index.map(lambda t: t.replace(year=2024))
+            
+            # ✅ Tri à nouveau (obligatoire après replace-year)
+            consum_kW = consum_kW.sort_index()
+            
+            # ✅ Supprimer les doublons créés par le changement d'année
+            consum_kW = consum_kW[~consum_kW.index.duplicated(keep="first")]
+            
+            # ✅ Mise sur grille uniforme 15 minutes (année complète)
+            idx_15m = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
+            consum_kW = consum_kW.reindex(idx_15m, method="nearest")
+
 
         
         # ✅ Calcul consommation annuelle réelle à partir du profil importé
