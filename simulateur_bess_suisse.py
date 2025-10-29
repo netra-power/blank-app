@@ -674,90 +674,56 @@ with row2_col2:
 
 
 # -------------------------------------------------------------
-# 📈 Profils — Profils moyens été / hiver (Juillet & Janvier)
+# 📈 Profils — Journées types été / hiver (21 juin & 21 décembre)
 # -------------------------------------------------------------
-st.markdown("## 📈 Profils — Profils moyens été / hiver")
+st.markdown("## 📈 Profils — Journées types été / hiver")
 
-# Sélection des données par mois
-summer = load[load.index.month == 7]
-winter = load[load.index.month == 1]
+def day_slice(date_str):
+    d0 = pd.Timestamp(date_str)
+    return (idx >= d0) & (idx < d0 + pd.Timedelta(days=1))
 
-pv_summer_raw = pv[pv.index.month == 7]
-pv_winter_raw = pv[pv.index.month == 1]
+mask_summer = day_slice("2024-06-21")
+mask_winter = day_slice("2024-12-21")
 
-charge_summer_raw = charged_s[charged_s.index.month == 7]
-discharge_summer_raw = discharged_s[discharged_s.index.month == 7]
+# Extraction des séries journalières
+conso_day_summer = load[mask_summer]
+conso_day_winter = load[mask_winter]
 
-charge_winter_raw = charged_s[charged_s.index.month == 1]
-discharge_winter_raw = discharged_s[discharged_s.index.month == 1]
+pv_day_summer = pv[mask_summer]
+pv_day_winter = pv[mask_winter]
 
-# Calcul du profil journalier moyen (groupby par heure)
-conso_summer = summer.groupby(summer.index.time).mean()
-conso_winter = winter.groupby(winter.index.time).mean()
+charge_day_summer = charged_s[mask_summer]
+discharge_day_summer = discharged_s[mask_summer]
 
-pv_summer = pv_summer_raw.groupby(pv_summer_raw.index.time).mean()
-pv_winter = pv_winter_raw.groupby(pv_winter_raw.index.time).mean()
+charge_day_winter = charged_s[mask_winter]
+discharge_day_winter = discharged_s[mask_winter]
 
-charge_summer = charge_summer_raw.groupby(charge_summer_raw.index.time).mean()
-discharge_summer = discharge_summer_raw.groupby(discharge_summer_raw.index.time).mean()
-
-charge_winter = charge_winter_raw.groupby(charge_winter_raw.index.time).mean()
-discharge_winter = discharge_winter_raw.groupby(discharge_winter_raw.index.time).mean()
-
-# Conversion index -> heures décimales pour Matplotlib
-import numpy as np
-def time_index_to_hours(series):
-    return np.array([t.hour + t.minute/60 for t in series.index])
-
-x_summer = time_index_to_hours(conso_summer)
-x_winter = time_index_to_hours(conso_winter)
-x_pv_summer = time_index_to_hours(pv_summer)
-x_pv_winter = time_index_to_hours(pv_winter)
-x_charge_summer = time_index_to_hours(charge_summer)
-x_charge_winter = time_index_to_hours(charge_winter)
-x_discharge_summer = time_index_to_hours(discharge_summer)
-x_discharge_winter = time_index_to_hours(discharge_winter)
-
-# ----- Affichage -----
+# ----- AFFICHAGE -----
 fig, axes = plt.subplots(2, 2, figsize=(12, 7), dpi=150)
 
 # Été - Conso & PV
-axes[0,0].plot(x_summer, conso_summer, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-axes[0,0].plot(x_pv_summer, pv_summer, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
-axes[0,0].set_title("Été — Profil journalier moyen (juillet)")
-axes[0,0].set_xticks([0, 6, 12, 18, 24])
-axes[0,0].set_xticklabels(["00:00", "06:00", "12:00", "18:00", "24:00"])
-axes[0,0].set_ylabel("Puissance (kW)")
+axes[0,0].plot(conso_day_summer.index, conso_day_summer, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+axes[0,0].plot(pv_day_summer.index, pv_day_summer, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
+axes[0,0].set_title("Été — 21 juin")
 axes[0,0].legend()
 
 # Hiver - Conso & PV
-axes[0,1].plot(x_winter, conso_winter, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-axes[0,1].plot(x_pv_winter, pv_winter, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
-axes[0,1].set_title("Hiver — Profil journalier moyen (janvier)")
-axes[0,1].set_xticks([0, 6, 12, 18, 24])
-axes[0,1].set_xticklabels(["00:00", "06:00", "12:00", "18:00", "24:00"])
-axes[0,1].set_ylabel("Puissance (kW)")
+axes[0,1].plot(conso_day_winter.index, conso_day_winter, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+axes[0,1].plot(pv_day_winter.index, pv_day_winter, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
+axes[0,1].set_title("Hiver — 21 décembre")
 axes[0,1].legend()
 
-# Été - Charge/Décharge BESS
-axes[1,0].bar(x_charge_summer, charge_summer, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
-axes[1,0].bar(x_discharge_summer, -discharge_summer, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
-axes[1,0].set_title("Flux batterie — Été (juillet)")
-axes[1,0].set_xticks([0, 6, 12, 18, 24])
-axes[1,0].set_xticklabels(["00:00", "06:00", "12:00", "18:00", "24:00"])
-axes[1,0].set_ylabel("Puissance (kW)")
+# Été - Batterie
+axes[1,0].bar(charge_day_summer.index, charge_day_summer, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
+axes[1,0].bar(discharge_day_summer.index, -discharge_day_summer, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
+axes[1,0].set_title("Flux batterie — Été (21 juin)")
 axes[1,0].legend()
 
-
-# Hiver - Charge/Décharge BESS
-axes[1,1].bar(x_charge_winter, charge_winter, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
-axes[1,1].bar(x_discharge_winter, -discharge_winter, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
-axes[1,1].set_title("Flux batterie — Hiver (janvier)")
-axes[1,1].set_xticks([0, 6, 12, 18, 24])
-axes[1,1].set_xticklabels(["00:00", "06:00", "12:00", "18:00", "24:00"])
-axes[1,1].set_ylabel("Puissance (kW)")
+# Hiver - Batterie
+axes[1,1].bar(charge_day_winter.index, charge_day_winter, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
+axes[1,1].bar(discharge_day_winter.index, -discharge_day_winter, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
+axes[1,1].set_title("Flux batterie — Hiver (21 décembre)")
 axes[1,1].legend()
-
 
 st.pyplot(fig)
 
