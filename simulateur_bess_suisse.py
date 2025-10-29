@@ -673,15 +673,6 @@ with row2_col2:
     st.image(svg, width=500)
 
 
-# 📌 Détermination du profil PV en kW selon la source
-if pv_upload is not None:
-    pv = pv_kW  # Profil PV importé en kW
-else:
-    pv = pv_kW  # Profil PV synthétique en kW (calculé plus haut)
-
-
-
-
 # -------------------------------------------------------------
 # 📈 Profils — Profils moyens été / hiver (Juillet & Janvier)
 # -------------------------------------------------------------
