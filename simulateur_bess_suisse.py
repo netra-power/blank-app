@@ -171,24 +171,26 @@ with st.sidebar:
     st.subheader("📊 Bâtiment — Consommation")
     st.markdown("📂 Import du profil de consommation bâtiment (.xlsx)")
 
-    cons_upload = st.file_uploader("Importer le fichier Excel de consommation", type=["xlsx"])
+    cons_upload = st.file_uploader("Importer profil conso (CSV)", type=["csv"])
 
     if cons_upload is not None:
         import pandas as pd
 
-        df = pd.read_excel(cons_upload, engine="openpyxl")
+        df = pd.read_csv(cons_upload, sep=";", header=None)
 
-        if df.columns[0] != "DateHeure" or df.columns[1] != "Consommation":
-            st.error("⚠️ Le fichier doit contenir les colonnes 'DateHeure' et 'Consommation'.")
-            st.stop()
+    # Ligne 1 : en-têtes
+        df.columns = ["DateHeure", "Consommation"]
 
+    # Lecture unité en B2 (ligne 2)
         unit = str(df.iloc[1,1]).strip()
+
+    # Supprimer ligne unité + garder données
         df = df.iloc[2:].copy()
 
-    # ✅ Conversion date heure au format jj.mm.aaaa hh:mm
+    # Conversion datetime (format européen)
         df["DateHeure"] = pd.to_datetime(df["DateHeure"], format="%d.%m.%Y %H:%M", errors="coerce")
 
-    # ✅ Conversion virgules → points
+    # Conversion virgules -> points puis float
         df["Consommation"] = (
             df["Consommation"]
             .astype(str)
@@ -196,12 +198,13 @@ with st.sidebar:
             .astype(float)
         )
 
+    # Interprétation selon unité
         if unit.lower().replace(" ", "") in ["(kw)", "kw"]:
-            st.write("🔍 Unité détectée : **Puissance (kW)**")
+            st.write("🔍 Profil interprété comme **Puissance (kW)**")
             consum_kW = df.set_index("DateHeure")["Consommation"]
 
         elif unit.lower().replace(" ", "") in ["(kwh)", "kwh"]:
-            st.write("🔍 Unité détectée : **Énergie par pas (kWh)**")
+            st.write("🔍 Profil interprété comme **Énergie par pas (kWh)**")
             df = df.sort_values("DateHeure")
             dt = (df["DateHeure"].iloc[1] - df["DateHeure"].iloc[0]).total_seconds() / 3600
             consum_kW = df["Consommation"] / dt
@@ -210,6 +213,7 @@ with st.sidebar:
         else:
             st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
             st.stop()
+
 
 
 
