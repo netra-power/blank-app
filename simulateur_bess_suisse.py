@@ -456,7 +456,7 @@ with row1_col1:
 
     fig, ax = plt.subplots(figsize=(2,2), dpi=300)
 
-    labels = ["Autoconsommation", "Vers batterie", "Export"]
+    labels = ["Bâtiment", "BESS", "Export"]
     sizes = [pv_self.sum(), pv_to_batt.sum(), pv_export.sum()]
     if sum(sizes) <= 0: sizes = [1,0,0]
     colors = [COLORS["pv"], COLORS["bess_charge"], COLORS["grid_export"]]
@@ -513,7 +513,7 @@ with row2_col1:
 
     fig, ax = plt.subplots(figsize=(2,2), dpi=300)
 
-    labels = ["PV direct", "BESS", "Réseau (import)"]
+    labels = ["PV", "Réseau"]
     sizes = [pv_self_no_bess.sum(), 0.0, grid_to_load_no_bess.sum()]
     if sum(sizes) <= 0:
         sizes = [1, 0, 0]
@@ -547,7 +547,7 @@ with row2_col2:
 
     fig, ax = plt.subplots(figsize=(2,2), dpi=300)
 
-    labels = ["PV direct", "BESS (décharge)", "Réseau (import)"]
+    labels = ["PV", "BESS", "Réseau"]
     sizes = [pv_self.sum(), bess_to_load.sum(), grid_to_load.sum()]
     if sum(sizes) <= 0:
         sizes = [1, 0, 0]
