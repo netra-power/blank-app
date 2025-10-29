@@ -736,7 +736,7 @@ format_time_axis(axes[1,0])
 axes[1,0].legend()
 
 # Hiver - Batterie
-axes[1,1].bar(x_winner, charge_day_winter, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
+axes[1,1].bar(x_winter, charge_day_winter, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
 axes[1,1].bar(x_winter, -discharge_day_winter, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
 axes[1,1].set_title("Flux batterie — Hiver (21 décembre)")
 format_time_axis(axes[1,1])
