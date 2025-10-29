@@ -740,22 +740,24 @@ axes[0,1].set_ylabel("Puissance (kW)")
 axes[0,1].legend()
 
 # Été - Charge/Décharge BESS
-axes[1,0].bar(x_charge_summer, charge_summer, label="Charge (kW)", color=COLORS["batt_charge"], alpha=0.6)
-axes[1,0].bar(x_discharge_summer, -discharge_summer, label="Décharge (kW)", color=COLORS["batt_discharge"], alpha=0.6)
+axes[1,0].bar(x_charge_summer, charge_summer, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
+axes[1,0].bar(x_discharge_summer, -discharge_summer, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
 axes[1,0].set_title("Flux batterie — Été (juillet)")
 axes[1,0].set_xticks([0, 6, 12, 18, 24])
 axes[1,0].set_xticklabels(["00:00", "06:00", "12:00", "18:00", "24:00"])
 axes[1,0].set_ylabel("Puissance (kW)")
 axes[1,0].legend()
 
+
 # Hiver - Charge/Décharge BESS
-axes[1,1].bar(x_charge_winter, charge_winter, label="Charge (kW)", color=COLORS["batt_charge"], alpha=0.6)
-axes[1,1].bar(x_discharge_winter, -discharge_winter, label="Décharge (kW)", color=COLORS["batt_discharge"], alpha=0.6)
+axes[1,1].bar(x_charge_winter, charge_winter, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
+axes[1,1].bar(x_discharge_winter, -discharge_winter, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
 axes[1,1].set_title("Flux batterie — Hiver (janvier)")
 axes[1,1].set_xticks([0, 6, 12, 18, 24])
 axes[1,1].set_xticklabels(["00:00", "06:00", "12:00", "18:00", "24:00"])
 axes[1,1].set_ylabel("Puissance (kW)")
 axes[1,1].legend()
+
 
 st.pyplot(fig)
 
