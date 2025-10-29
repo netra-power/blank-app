@@ -673,77 +673,71 @@ with row2_col2:
     st.image(svg, width=500)
 
 
+# -------------------------------------------------------------
+# 📈 Profils — Profils moyens été / hiver (Juillet & Janvier)
+# -------------------------------------------------------------
+st.markdown("## 📈 Profils — Profils moyens été / hiver")
 
-# ---------- Profils été/hiver (moyennes mensuelles) ----------
-if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_kw > 0):
-    st.markdown("### 📈 Profils — Profils moyens été / hiver")
+# Sélection des mois
+summer = load[load.index.month == 7]
+winter = load[load.index.month == 1]
 
-    # Été = Juillet
-    ls = load[load.index.month == 7]
-    conso_summer = ls.groupby(ls.index.time).mean()
+pv_summer = pv_profile[pv_profile.index.month == 7]
+pv_winter = pv_profile[pv_profile.index.month == 1]
 
-    ps = pv[pv.index.month == 7]
-    pv_summer = ps.groupby(ps.index.time).mean()
+charge_summer = charged_s[charged_s.index.month == 7]
+discharge_summer = discharged_s[discharged_s.index.month == 7]
 
-    cs = charged_s[charged_s.index.month == 7]
-    charge_summer = cs.groupby(cs.index.time).mean()
+charge_winter = charged_s[charged_s.index.month == 1]
+discharge_winter = discharged_s[discharged_s.index.month == 1]
 
-    ds = discharged_s[discharged_s.index.month == 7]
-    discharge_summer = ds.groupby(ds.index.time).mean()
+# Calcul du profil journalier moyen (moyenne par heure/15 min)
+conso_summer = summer.groupby(summer.index.time).mean()
+conso_winter = winter.groupby(winter.index.time).mean()
 
-    # Hiver = Décembre
-    lw = load[load.index.month == 12]
-    conso_winter = lw.groupby(lw.index.time).mean()
+pv_summer = pv_summer.groupby(pv_summer.index.time).mean()
+pv_winter = pv_winter.groupby(pv_winter.index.time).mean()
 
-    pw = pv[pv.index.month == 12]
-    pv_winter = pw.groupby(pw.index.time).mean()
+charge_summer = charge_summer.groupby(charge_summer.index.time).mean()
+discharge_summer = discharge_summer.groupby(discharge_summer.index.time).mean()
 
-    cw = charged_s[charged_s.index.month == 12]
-    charge_winter = cw.groupby(cw.index.time).mean()
+charge_winter = charge_winter.groupby(charge_winter.index.time).mean()
+discharge_winter = discharge_winter.groupby(discharge_winter.index.time).mean()
 
-    dw = discharged_s[discharged_s.index.month == 12]
-    discharge_winter = dw.groupby(dw.index.time).mean()
+# ----- Affichage -----
+fig, axes = plt.subplots(2, 2, figsize=(12, 7), dpi=150)
 
-    # 🔄 Convertir index -> datetime pour tracé Matplotlib
-    import pandas as pd
-    for s in [conso_summer, conso_winter, pv_summer, pv_winter, charge_summer, discharge_summer, charge_winter, discharge_winter]:
-        s.index = pd.to_datetime(s.index.astype(str))
+# Été - Conso & PV
+axes[0,0].plot(conso_summer.index, conso_summer, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+axes[0,0].plot(pv_summer.index, pv_summer, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
+axes[0,0].set_title("Été — Profil journalier moyen (juillet)")
+axes[0,0].set_xticks([datetime.time(h,0) for h in [0,6,12,18]])
+axes[0,0].legend()
 
-    # --- Graphes Conso vs PV ---
-    r3c1, r3c2 = st.columns(2)
+# Hiver - Conso & PV
+axes[0,1].plot(conso_winter.index, conso_winter, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+axes[0,1].plot(pv_winter.index, pv_winter, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
+axes[0,1].set_title("Hiver — Profil journalier moyen (janvier)")
+axes[0,1].set_xticks([datetime.time(h,0) for h in [0,6,12,18]])
+axes[0,1].legend()
 
-    fig, ax = plt.subplots(figsize=(8,3))
-    ax.plot(conso_summer.index, conso_summer.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-    ax.plot(pv_summer.index, pv_summer.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
-    ax.fill_between(conso_summer.index, 0, np.minimum(conso_summer.values, pv_summer.values), alpha=0.18, color=COLORS["pv"])
-    ax.set_title("Été — Profil moyen (juillet)")
-    ax.legend()
-    r3c1.pyplot(fig)
+# Été - Charge/Décharge BESS
+axes[1,0].bar(charge_summer.index, charge_summer, label="Charge (kW)", color=COLORS["batt_charge"], alpha=0.5)
+axes[1,0].bar(discharge_summer.index, -discharge_summer, label="Décharge (kW)", color=COLORS["batt_discharge"], alpha=0.5)
+axes[1,0].set_title("Flux batterie — Été (juillet)")
+axes[1,0].set_xticks([datetime.time(h,0) for h in [0,6,12,18]])
+axes[1,0].legend()
 
-    fig2, ax2 = plt.subplots(figsize=(8,3))
-    ax2.plot(conso_winter.index, conso_winter.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-    ax2.plot(pv_winter.index, pv_winter.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
-    ax2.fill_between(conso_winter.index, 0, np.minimum(conso_winter.values, pv_winter.values), alpha=0.18, color=COLORS["pv"])
-    ax2.set_title("Hiver — Profil moyen (décembre)")
-    ax2.legend()
-    r3c2.pyplot(fig2)
+# Hiver - Charge/Décharge BESS
+axes[1,1].bar(charge_winter.index, charge_winter, label="Charge (kW)", color=COLORS["batt_charge"], alpha=0.5)
+axes[1,1].bar(discharge_winter.index, -discharge_winter, label="Décharge (kW)", color=COLORS["batt_discharge"], alpha=0.5)
+axes[1,1].set_title("Flux batterie — Hiver (janvier)")
+axes[1,1].set_xticks([datetime.time(h,0) for h in [0,6,12,18]])
+axes[1,1].legend()
 
-    # --- Graphes Batterie ---
-    r4c1, r4c2 = st.columns(2)
+st.pyplot(fig)
 
-    fig3, ax3 = plt.subplots(figsize=(8,3))
-    ax3.bar(charge_summer.index, charge_summer.values, color=COLORS["bess_charge"], alpha=0.8, label="Charge (kW)")
-    ax3.bar(discharge_summer.index, -discharge_summer.values, color=COLORS["bess_discharge"], alpha=0.8, label="Décharge (kW)")
-    ax3.set_title("Flux batterie — Été (juillet)")
-    ax3.legend()
-    r4c1.pyplot(fig3)
 
-    fig4, ax4 = plt.subplots(figsize=(8,3))
-    ax4.bar(charge_winter.index, charge_winter.values, color=COLORS["bess_charge"], alpha=0.8, label="Charge (kW)")
-    ax4.bar(discharge_winter.index, -discharge_winter.values, color=COLORS["bess_discharge"], alpha=0.8, label="Décharge (kW)")
-    ax4.set_title("Flux batterie — Hiver (décembre)")
-    ax4.legend()
-    r4c2.pyplot(fig4)
 
 
 
