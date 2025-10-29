@@ -207,35 +207,19 @@ with st.sidebar:
             st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
             st.stop()
     
-            # ✅ Tri + suppression des doublons
+        # ✅ Tri + suppression des doublons
         consum_kW = consum_kW.sort_index()
         consum_kW = consum_kW[~consum_kW.index.duplicated(keep="first")]
-
-        # ✅ Supprimer toutes les valeurs où la date est NaT (important)
         consum_kW = consum_kW[consum_kW.index.notna()]
-
-    
-        # ✅ Détection du pas de temps automatique
-        dt_seconds = (
-            consum_kW.index.to_series().diff().dropna().dt.total_seconds().mode()[0]
-        )
-    
-        if dt_seconds == 900:
-            st.info("⏱️ Pas de temps détecté : **15 min** ✅")
-        elif dt_seconds == 1800:
-            st.warning("⏱️ Pas de temps détecté : **30 min** → conversion en 15 min")
-        elif dt_seconds == 3600:
-            st.warning("⏱️ Pas de temps détecté : **1h** → conversion en 15 min")
-        else:
-            st.warning(f"⏱️ Pas de temps irrégulier ({int(dt_seconds)} sec) → conversion en 15 min")
-
-        # ✅ S'assurer que les valeurs sont bien des floats
         consum_kW = consum_kW.astype(float)
-
-    
-        # ✅ Mise sur grille 15 min uniforme
-        idx_15m = pd.date_range(consum_kW.index.min(), consum_kW.index.max(), freq="15T")
+        
+        # ✅ Normalisation de l’année → on conserve MOIS/JOUR/HEURE/MINUTE
+        consum_kW.index = consum_kW.index.map(lambda t: t.replace(year=2024))
+        
+        # ✅ Mise sur grille uniforme 15 min sur toute l'année 2024
+        idx_15m = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
         consum_kW = consum_kW.reindex(idx_15m, method="nearest")
+
         
         # ✅ Calcul consommation annuelle réelle à partir du profil importé
         annual_kwh_from_csv = (consum_kW * 0.25).sum()
