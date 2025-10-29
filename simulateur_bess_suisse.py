@@ -449,7 +449,7 @@ m1.metric("Revenu annuel total", f"{total_rev:,.0f} CHF")
 m2.metric("CAPEX total", f"{capex_total:,.0f} CHF")
 
 # ---------- Ligne 1 (2x2) : PV split + Autoconso table ----------
-row1_col1, row1_col2 = st.columns(2)
+row1_col1, row1_col2 = st.columns([1, 1])
 with row1_col1:
     st.markdown("#### ☀️ Répartition de production PV")
 
@@ -501,7 +501,7 @@ with row1_col2:
 
 
 # ---------- Ligne 2 (2x2) : Sources d'énergie sans/avec BESS ----------
-row2_col1, row2_col2 = st.columns(2)
+row2_col1, row2_col2 = st.columns([1, 1])
 with row2_col1:
     st.markdown("#### 🔌 Sources d'énergie du bâtiment — PV seul")
 
