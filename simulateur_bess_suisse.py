@@ -261,12 +261,15 @@ idx = year_hours(2024)
 
 # Si un fichier CSV a été importé (consum_kW déjà calculé dans la sidebar)
 if cons_upload is not None:
+    st.success("✅ Profil de consommation chargé depuis le fichier CSV")
     load = consum_kW.reindex(idx, method="nearest")
 
 # Sinon → profil synthétique comme avant
 else:
+    st.info("ℹ️ Aucun fichier importé — profil construit à partir du type de bâtiment et de la consommation annuelle")
     load = build_consumption_profile(building_kind, annual_kwh, start_year=2024)
     consum_kW = load.copy()
+
 
 
 
