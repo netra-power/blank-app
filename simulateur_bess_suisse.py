@@ -674,31 +674,51 @@ with row2_col2:
 
 
 
-# ---------- Profils été/hiver (2x2) ----------
+# ---------- Profils été/hiver (moyennes mensuelles) ----------
 if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_kw > 0):
-    st.markdown("### 📈 Profils — Journées type été / hiver")
+    st.markdown("### 📈 Profils — Profils moyens été / hiver")
 
-    def day_slice(date_str):
-        d0 = pd.Timestamp(date_str)
-        return (idx >= d0) & (idx < d0 + pd.Timedelta(days=1))
+    # Profils MOYENS sur Juillet (été) & Décembre (hiver)
+    conso_summer = load[load.index.month == 7].groupby(load.index.time).mean()
+    conso_winter = load[load.index.month == 12].groupby(load.index.time).mean()
 
-    mask_summer = day_slice("2024-07-15")
-    mask_winter = day_slice("2024-01-15")
+    pv_summer = pv[pv.index.month == 7].groupby(pv.index.time).mean()
+    pv_winter = pv[pv.index.month == 12].groupby(pv.index.time).mean()
 
+    charge_summer = charged_s[charged_s.index.month == 7].groupby(charged_s.index.time).mean()
+    discharge_summer = discharged_s[discharged_s.index.month == 7].groupby(discharged_s.index.time).mean()
+
+    charge_winter = charged_s[charged_s.index.month == 12].groupby(charged_s.index.time).mean()
+    discharge_winter = discharged_s[discharged_s.index.month == 12].groupby(discharged_s.index.time).mean()
+
+    # --- Conso vs PV ---
     r3c1, r3c2 = st.columns(2)
-    for label, mask, col in [("Été (15 juillet)", mask_summer, r3c1), ("Hiver (15 janvier)", mask_winter, r3c2)]:
-        lday = load[mask].values
-        pvday = pv[mask].values
-        tday = load[mask].index
 
+    for title, c, p, col in [
+        ("Été (moyenne juillet)", conso_summer, pv_summer, r3c1),
+        ("Hiver (moyenne décembre)", conso_winter, pv_winter, r3c2),
+    ]:
         fig, ax = plt.subplots(figsize=(8,3))
-        ax.plot(tday, lday, label="Conso (kWh/h)", color=COLORS["load"], linewidth=1.8)
-        ax.plot(tday, pvday, label="PV (kWh/h)", color=COLORS["pv"], linewidth=1.6)
-        auto_day = np.minimum(lday, pvday)
-        ax.fill_between(tday, 0, auto_day, hatch='//', alpha=0.18, color=COLORS["pv"], label="Autoconsommation")
-        ax.set_title(f"Conso vs PV — {label}", color=COLORS["text"])
+        ax.plot(c.index, c.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+        ax.plot(p.index, p.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
+        ax.fill_between(c.index, 0, np.minimum(c.values, p.values), alpha=0.18, hatch="//", color=COLORS["pv"], label="Autoconsommation")
+        ax.set_title(f"Conso vs PV — {title}", color=COLORS["text"])
         ax.legend()
         col.pyplot(fig)
+
+    # --- Flux batterie ---
+    r4c1, r4c2 = st.columns(2)
+    for title, ch, dis, col in [
+        ("Été (moyenne juillet)", charge_summer, discharge_summer, r4c1),
+        ("Hiver (moyenne décembre)", charge_winter, discharge_winter, r4c2),
+    ]:
+        fig2, ax2 = plt.subplots(figsize=(8,3))
+        ax2.bar(ch.index, ch.values, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.9)
+        ax2.bar(dis.index, -dis.values, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.9)
+        ax2.set_title(f"Flux batterie — {title}", color=COLORS["text"])
+        ax2.legend()
+        col.pyplot(fig2)
+
 
     r4c1, r4c2 = st.columns(2)
     for label, mask, col in [("Été (15 juillet)", mask_summer, r4c1), ("Hiver (15 janvier)", mask_winter, r4c2)]:
