@@ -189,7 +189,8 @@ with st.sidebar:
     
         if unit_clean in ["(kw)", "kw"]:
             st.success("✅ Profil importé en puissance (kW)")
-            consum_kW = df.set_index("DateHeure")["Consommation"]
+            consum_kW = df.set_index("DateHeure")["Consommation"].rename("Consommation_kW")
+
     
         elif unit_clean in ["(kwh)", "kwh"]:
             st.success("✅ Profil importé en énergie (kWh) → conversion en kW")
@@ -197,7 +198,10 @@ with st.sidebar:
             dt = (df["DateHeure"].shift(-1) - df["DateHeure"]).dt.total_seconds() / 3600
             consum_KW = df["Consommation"] / dt
             consum_KW.index = df["DateHeure"]
-            consum_kW = consum_KW.copy()
+
+# ✅ Toujours créer la variable standard consum_kW
+            consum_kW = consum_KW.rename("Consommation_kW")
+
     
         else:
             st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
@@ -224,6 +228,10 @@ with st.sidebar:
             st.warning("⏱️ Pas de temps détecté : **1h** → conversion en 15 min")
         else:
             st.warning(f"⏱️ Pas de temps irrégulier ({int(dt_seconds)} sec) → conversion en 15 min")
+
+        # ✅ S'assurer que les valeurs sont bien des floats
+        consum_kW = consum_kW.astype(float)
+
     
         # ✅ Mise sur grille 15 min uniforme
         idx_15m = pd.date_range(consum_kW.index.min(), consum_kW.index.max(), freq="15T")
