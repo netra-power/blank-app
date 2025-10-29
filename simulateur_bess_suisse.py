@@ -303,8 +303,13 @@ idx = year_hours(2024)
 # ✅ Toujours utiliser consum_kW (qu'il vienne du CSV ou du profil synthétique)
 load = consum_kW.copy()
 
-# ✅ Harmonisation du pas de temps sur l’année complète
+# ✅ Toujours trier et enlever les doublons avant reindex
+load = load.sort_index()
+load = load[~load.index.duplicated(keep="first")]
+
+# ✅ Puis seulement maintenant → reindex sur la grille 15 min
 load = load.reindex(idx, method="nearest")
+
 
 
 if has_pv:
