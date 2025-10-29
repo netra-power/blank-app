@@ -475,7 +475,8 @@ with row1_col1:
 
     ax.set_title("")
     ax.set_aspect('equal', adjustable='datalim')
-    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    fig.subplots_adjust(left=0.12, right=0.88, top=0.88, bottom=0.12)
+
 
     svg = fig_to_svg(fig)
     st.image(svg, width=500)
@@ -530,7 +531,8 @@ with row2_col1:
 
     ax.set_title("")
     ax.set_aspect('equal', adjustable='datalim')
-    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    fig.subplots_adjust(left=0.12, right=0.88, top=0.88, bottom=0.12)
+
 
     svg = fig_to_svg(fig)
     st.image(svg, width=500)
@@ -563,7 +565,8 @@ with row2_col2:
 
     ax.set_title("")
     ax.set_aspect('equal', adjustable='datalim')
-    fig.subplots_adjust(left=0, right=1, top=1, bottom=0)
+    fig.subplots_adjust(left=0.12, right=0.88, top=0.88, bottom=0.12)
+
 
     svg = fig_to_svg(fig)
     st.image(svg, width=500)
