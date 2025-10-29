@@ -672,11 +672,13 @@ with row2_col2:
     svg = fig_to_svg(fig)
     st.image(svg, width=500)
 
-# PV toujours en kW sur index horaire
+
+# 📌 Détermination du profil PV en kW selon la source
 if pv_upload is not None:
-    pv = pv_kW  # issu du CSV
+    pv = pv_kW  # Profil PV importé en kW
 else:
-    pv = pv_gen  # profil synthétique existant
+    pv = pv_kw  # Profil PV synthétique en kW (calculé plus haut)
+
 
 
 # -------------------------------------------------------------
