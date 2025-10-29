@@ -467,18 +467,14 @@ with row1_col1:
         autopct=lambda p: f"{p:.0f}%",
         startangle=90,
         colors=colors,
-        radius=0.8,
-        labeldistance=0.88,   # ← labels tirés vers l'intérieur
-        pctdistance=0.62      # ← % un peu plus centrés
+        radius=0.8
     )
 
 
-    for t in texts:      
+    for t in texts:
         t.set_fontsize(6)
-        t.set_clip_on(False)  # ← évite la coupe au bord de l’axe
     for t in autotexts:
         t.set_fontsize(6)
-        t.set_clip_on(False)
 
 
     ax.set_title("")
