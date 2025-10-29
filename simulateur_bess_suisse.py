@@ -347,7 +347,8 @@ if marche_libre == "Oui":
         t = np.arange(8760)
         prices = pd.Series(0.12 + 0.03*np.sin(2*np.pi*(t%24)/24), index=idx)
 else:
-    prices = pd.Series(np.full(8760, price_buy_fixed), index=idx)
+    prices = pd.Series(np.full(len(idx), price_buy_fixed), index=idx)
+
 
 # -----------------------------
 # Simulation + dispatch (distinction charge PV / charge réseau)
