@@ -169,11 +169,55 @@ with st.sidebar:
     eur_chf = st.number_input("Taux EUR→CHF", min_value=0.5, max_value=2.0, value=1.0, step=0.01)
 
     st.subheader("📊 Bâtiment — Consommation")
-    st.markdown("> ⚙️ **Format CSV attendu :** 1 colonne, 8760 valeurs horaires (kWh/h), sans en-tête (séparateur ',' ou ';').")
-    cons_upload = st.file_uploader("Importer profil conso (CSV)", type=["csv"])
-    if cons_upload is None:
-        building_kind = st.selectbox("Profil type", ["Résidentiel", "Tertiaire (bureaux)", "Industriel léger", "Industriel lourd"])
-        annual_kwh = st.number_input("Consommation annuelle (kWh)", min_value=0.0, value=670000.0, step=1000.0, format="%.0f")
+    st.markdown("📂 Import du profil de consommation bâtiment (.xlsx)")
+
+    cons_upload = st.file_uploader("Importer le fichier Excel de consommation", type=["xlsx"])
+
+    if cons_upload is not None:
+        import pandas as pd
+
+        df = pd.read_excel(cons_upload)
+
+    # Vérification structure minimale
+        if df.columns[0] != "DateHeure" or df.columns[1] != "Consommation":
+            st.error("⚠️ Le fichier doit contenir les colonnes 'DateHeure' et 'Consommation'.")
+            st.stop()
+
+    # Lecture unité en B2 (peut être `(kW)` ou `(kWh)`)
+        unit = str(df.iloc[1,1]).strip()
+        df = df.iloc[2:].copy()  # Enlève ligne unité
+
+    # Conversion du champ date
+        df["DateHeure"] = pd.to_datetime(df["DateHeure"])
+
+    # Conversion consommation (gestion des virgules → points)
+        df["Consommation"] = (
+            df["Consommation"]
+            .astype(str)
+            .str.replace(",", ".", regex=False)
+            .astype(float)
+        )
+
+    # Interprétation selon l’unité
+        if unit.lower().replace(" ", "") in ["(kw)", "kw"]:
+            st.write("🔍 Unité détectée : **Puissance (kW)**")
+            consum_kW = df.set_index("DateHeure")["Consommation"]
+
+        elif unit.lower().replace(" ", "") in ["(kwh)", "kwh"]:
+            st.write("🔍 Unité détectée : **Énergie par intervalle (kWh)**")
+            df = df.sort_values("DateHeure")
+            dt = (df["DateHeure"].iloc[1] - df["DateHeure"].iloc[0]).total_seconds() / 3600
+            consum_kW = df["Consommation"] / dt
+            consum_kW.index = df["DateHeure"]
+
+        else:
+            st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
+            st.stop()
+
+    else:
+        st.warning("📄 Merci de charger un fichier de consommation (.xlsx)")
+        st.stop()
+
 
     has_pv = "PV" in system_type
     if has_pv:
