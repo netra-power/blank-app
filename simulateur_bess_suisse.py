@@ -297,15 +297,6 @@ load = consum_kW.copy()
 load = load.reindex(idx, method="nearest")
 
 
-# Sinon → profil synthétique comme avant
-else:
-    st.info("ℹ️ Aucun fichier importé — profil construit à partir du type de bâtiment et de la consommation annuelle")
-    load = build_consumption_profile(building_kind, annual_kwh, start_year=2024)
-    consum_kW = load.copy()
-
-
-
-
 if has_pv:
     if pv_upload:
         pv_df = pd.read_csv(pv_upload, header=None, sep=None, engine="python")
