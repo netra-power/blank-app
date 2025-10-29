@@ -240,11 +240,19 @@ with st.sidebar:
         # ✅ Calcul consommation annuelle réelle à partir du profil importé
         annual_kwh_from_csv = (consum_kW * 0.25).sum()
 
-        st.metric(
-            label="Consommation annuelle (profil importé)",
-            value=f"{annual_kwh_from_csv:,.0f} kWh",
-            help="Somme puissance(kW) × 0.25 h sur l'année"
+        # Format nombre avec espace comme séparateur
+        annual_kwh_display = f"{annual_kwh_from_csv:,.0f}".replace(",", " ")
+        
+        st.markdown(
+            f"""
+            <div style="margin-top:0.5rem; margin-bottom:0.5rem;">
+                <span style="font-size:0.9rem; color:#6c757d;">Consommation annuelle (profil importé)</span><br>
+                <span style="font-size:1.1rem; font-weight:600;">{annual_kwh_display} kWh</span>
+            </div>
+            """,
+            unsafe_allow_html=True
         )
+
 
 
     else:
