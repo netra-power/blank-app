@@ -203,9 +203,13 @@ with st.sidebar:
             st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
             st.stop()
     
-        # ✅ Tri & suppression des doublons
+            # ✅ Tri + suppression des doublons
         consum_kW = consum_kW.sort_index()
         consum_kW = consum_kW[~consum_kW.index.duplicated(keep="first")]
+
+        # ✅ Supprimer toutes les valeurs où la date est NaT (important)
+        consum_kW = consum_kW[consum_kW.index.notna()]
+
     
         # ✅ Détection du pas de temps automatique
         dt_seconds = (
