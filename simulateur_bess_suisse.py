@@ -174,7 +174,6 @@ with st.sidebar:
     cons_upload = st.file_uploader("Importer un fichier CSV de consommation (optionnel)", type=["csv"])
 
     if cons_upload is not None:
-    if cons_upload is not None:
         import pandas as pd
     
         df = pd.read_csv(cons_upload, sep=";", header=None, dtype=str)
