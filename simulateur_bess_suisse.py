@@ -191,39 +191,39 @@ with st.sidebar:
             st.success("✅ Profil importé en puissance (kW)")
             consum_kW = df.set_index("DateHeure")["Consommation"]
 
-        elif unit_clean in ["(kwh)", "kwh"]:
-            st.success("✅ Profil importé en énergie (kWh) → conversion en kW")
-            df = df.sort_values("DateHeure")
-            dt = (df["DateHeure"].shift(-1) - df["DateHeure"]).dt.total_seconds() / 3600
-            consum_KW = df["Consommation"] / dt
-            consum_KW.index = df["DateHeure"]
-            consum_kW = consum_KW.copy()
+            elif unit_clean in ["(kwh)", "kwh"]:
+                st.success("✅ Profil importé en énergie (kWh) → conversion en kW")
+                df = df.sort_values("DateHeure")
+                dt = (df["DateHeure"].shift(-1) - df["DateHeure"]).dt.total_seconds() / 3600
+                consum_KW = df["Consommation"] / dt
+                consum_KW.index = df["DateHeure"]
+                consum_kW = consum_KW.copy()
 
     # ✅ Tri + suppression de doublons (pas obligatoire, mais évite les crash)
-        consum_kW = consum_kW.sort_index()
-        consum_kW = consum_kW[~consum_kW.index.duplicated(keep="first")]
+            consum_kW = consum_kW.sort_index()
+            consum_kW = consum_kW[~consum_kW.index.duplicated(keep="first")]
 
     # ✅ Détection automatique du pas de temps
-        dt_seconds = (
-            consum_kW.index.to_series()
-            .diff()
-            .dropna()
-            .dt.total_seconds()
-            .mode()[0]   # mode = intervalle dominant
-        )
+            dt_seconds = (
+                consum_kW.index.to_series()
+                .diff()
+                .dropna()
+                .dt.total_seconds()
+                .mode()[0]   # mode = intervalle dominant
+            )
 
-        if dt_seconds == 900:
-            st.info("⏱️ Pas de temps détecté : **15 minutes** ✅ (pas de conversion)")
-        elif dt_seconds == 1800:
-            st.warning("⏱️ Pas de temps détecté : **30 minutes** → conversion en 15 min")
-        elif dt_seconds == 3600:
-            st.warning("⏱️ Pas de temps détecté : **1 heure** → conversion en 15 min")
-        else:
-            st.warning(f"⏱️ Pas de temps irrégulier ({int(dt_seconds)} s) → conversion en standard 15 min")
+            if dt_seconds == 900:
+                st.info("⏱️ Pas de temps détecté : **15 minutes** ✅ (pas de conversion)")
+            elif dt_seconds == 1800:
+                st.warning("⏱️ Pas de temps détecté : **30 minutes** → conversion en 15 min")
+            elif dt_seconds == 3600:
+                st.warning("⏱️ Pas de temps détecté : **1 heure** → conversion en 15 min")
+            else:
+                st.warning(f"⏱️ Pas de temps irrégulier ({int(dt_seconds)} s) → conversion en standard 15 min")
 
     # ✅ Normalisation sur une grille annuelle 15 min
-        idx_15m = pd.date_range(consum_kW.index.min(), consum_kW.index.max(), freq="15T")
-        consum_kW = consum_kW.reindex(idx_15m, method="nearest")
+            idx_15m = pd.date_range(consum_kW.index.min(), consum_kW.index.max(), freq="15T")
+            consum_kW = consum_kW.reindex(idx_15m, method="nearest")
 
 
         else:
