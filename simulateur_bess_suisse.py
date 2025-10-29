@@ -514,10 +514,10 @@ with row2_col1:
     fig, ax = plt.subplots(figsize=(2,2), dpi=300)
 
     labels = ["PV", "Réseau"]
-    sizes = [pv_self_no_bess.sum(), 0.0, grid_to_load_no_bess.sum()]
+    sizes = [pv_self_no_bess.sum(), grid_to_load_no_bess.sum()]
     if sum(sizes) <= 0:
-        sizes = [1, 0, 0]
-    colors = [COLORS["pv"], COLORS["bess_discharge"], COLORS["grid_import"]]
+        sizes = [1, 0]
+    colors = [COLORS["pv"], COLORS["grid_import"]]
 
     wedges, texts, autotexts = ax.pie(
         sizes,
