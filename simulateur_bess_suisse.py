@@ -677,7 +677,8 @@ with row2_col2:
 if pv_upload is not None:
     pv = pv_kW  # Profil PV importé en kW
 else:
-    pv = pv_kw  # Profil PV synthétique en kW (calculé plus haut)
+    pv = pv_kW  # Profil PV synthétique en kW (calculé plus haut)
+
 
 
 
