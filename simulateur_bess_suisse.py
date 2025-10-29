@@ -672,12 +672,12 @@ with row2_col2:
     svg = fig_to_svg(fig)
     st.image(svg, width=500)
 
-
 # -------------------------------------------------------------
 # 📈 Profils — Journées types été / hiver (21 juin & 21 décembre)
 # -------------------------------------------------------------
 st.markdown("## 📈 Profils — Journées types été / hiver")
 
+# Sélection de la journée
 def day_slice(date_str):
     d0 = pd.Timestamp(date_str)
     return (idx >= d0) & (idx < d0 + pd.Timedelta(days=1))
@@ -698,34 +698,53 @@ discharge_day_summer = discharged_s[mask_summer]
 charge_day_winter = charged_s[mask_winter]
 discharge_day_winter = discharged_s[mask_winter]
 
+# Conversion index → heures (0 → 24)
+import numpy as np
+def to_hours(series):
+    return np.array([t.hour + t.minute/60 for t in series.index])
+
+x_summer = to_hours(conso_day_summer)
+x_winter = to_hours(conso_day_winter)
+
+def format_time_axis(ax):
+    ax.set_xticks([0, 6, 12, 18, 24])
+    ax.set_xticklabels(["00:00", "06:00", "12:00", "18:00", "24:00"])
+    ax.set_xlim(0, 24)
+
 # ----- AFFICHAGE -----
 fig, axes = plt.subplots(2, 2, figsize=(12, 7), dpi=150)
 
 # Été - Conso & PV
-axes[0,0].plot(conso_day_summer.index, conso_day_summer, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-axes[0,0].plot(pv_day_summer.index, pv_day_summer, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
+axes[0,0].plot(x_summer, conso_day_summer, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+axes[0,0].plot(x_summer, pv_day_summer, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
 axes[0,0].set_title("Été — 21 juin")
+format_time_axis(axes[0,0])
 axes[0,0].legend()
 
 # Hiver - Conso & PV
-axes[0,1].plot(conso_day_winter.index, conso_day_winter, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-axes[0,1].plot(pv_day_winter.index, pv_day_winter, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
+axes[0,1].plot(x_winter, conso_day_winter, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+axes[0,1].plot(x_winter, pv_day_winter, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
 axes[0,1].set_title("Hiver — 21 décembre")
+format_time_axis(axes[0,1])
 axes[0,1].legend()
 
 # Été - Batterie
-axes[1,0].bar(charge_day_summer.index, charge_day_summer, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
-axes[1,0].bar(discharge_day_summer.index, -discharge_day_summer, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
+axes[1,0].bar(x_summer, charge_day_summer, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
+axes[1,0].bar(x_summer, -discharge_day_summer, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
 axes[1,0].set_title("Flux batterie — Été (21 juin)")
+format_time_axis(axes[1,0])
 axes[1,0].legend()
 
 # Hiver - Batterie
-axes[1,1].bar(charge_day_winter.index, charge_day_winter, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
-axes[1,1].bar(discharge_day_winter.index, -discharge_day_winter, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
+axes[1,1].bar(x_winner, charge_day_winter, label="Charge (kW)", color=COLORS["bess_charge"], alpha=0.6)
+axes[1,1].bar(x_winter, -discharge_day_winter, label="Décharge (kW)", color=COLORS["bess_discharge"], alpha=0.6)
 axes[1,1].set_title("Flux batterie — Hiver (21 décembre)")
+format_time_axis(axes[1,1])
 axes[1,1].legend()
 
 st.pyplot(fig)
+
+
 
 
 
