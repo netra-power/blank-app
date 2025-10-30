@@ -700,20 +700,21 @@ for (label, conso_day, pv_day, col) in [
     ("Été — 21 juin", conso_su, pv_su, r3c1),
     ("Hiver — 21 décembre", conso_wi, pv_wi, r3c2)
 ]:
-    # Alignement PV sur index conso
-    pv_align = pv_day.reindex(conso_day.index, method="nearest")
+    # ✅ Alignement indispensable des index
+    pv_day = pv_day.reindex(conso_day.index, method="nearest")
 
-    fig, ax = plt.subplots(figsize=(8, 3))
+    fig, ax = plt.subplots(figsize=(8, 3), dpi=150)
     ax.plot(conso_day.index, conso_day.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-    ax.plot(conso_day.index, pv_align.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
+    ax.plot(conso_day.index, pv_day.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
 
-    # ✅ Hachurage autoconsommation
-    auto = np.minimum(conso_day.values, pv_align.values)
+    # ✅ Zone autoconsommée réaliste
+    auto = np.minimum(conso_day.values, pv_day.values)
     ax.fill_between(conso_day.index, 0, auto, color=COLORS["pv"], alpha=0.22, hatch="//", label="Autoconsommation")
 
     ax.set_title(label, color=COLORS["text"])
     ax.legend()
     col.pyplot(fig)
+
 
 # --- Graphiques Charge / Décharge BESS (identiques à l'origine)
 r4c1, r4c2 = st.columns(2)
