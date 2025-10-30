@@ -678,78 +678,56 @@ with row2_col2:
 # -------------------------------------------------------------
 st.markdown("### 📈 Profils — Journées type (21 juin / 21 décembre)")
 
-# Masques pour chaque série (car leurs index peuvent différer après reindex)
-mask_summer_load = (consum_kW.index.month == 6) & (consum_kW.index.day == 21)
-mask_winter_load = (consum_kW.index.month == 12) & (consum_kW.index.day == 21)
+# ✅ Masques cohérents (basés sur idx unique)
+mask_summer = (idx.month == 6) & (idx.day == 21)
+mask_winter = (idx.month == 12) & (idx.day == 21)
 
-mask_summer_pv = (pv.index.month == 6) & (pv.index.day == 21)
-mask_winter_pv = (pv.index.month == 12) & (pv.index.day == 21)
+# ✅ Extraction alignée
+conso_su = load[mask_summer]
+pv_su = pv[mask_summer]
+ch_su = charged_s[mask_summer]
+dis_su = discharged_s[mask_summer]
 
-mask_summer_ch = (charged_s.index.month == 6) & (charged_s.index.day == 21)
-mask_winter_ch = (charged_s.index.month == 12) & (charged_s.index.day == 21)
-
-mask_summer_dis = (discharged_s.index.month == 6) & (discharged_s.index.day == 21)
-mask_winter_dis = (discharged_s.index.month == 12) & (discharged_s.index.day == 21)
-
+conso_wi = load[mask_winter]
+pv_wi = pv[mask_winter]
+ch_wi = charged_s[mask_winter]
+dis_wi = discharged_s[mask_winter]
 
 # --- Graphiques Conso + PV ---
 r3c1, r3c2 = st.columns(2)
-
-# Été
-conso_su = consum_kW[mask_summer_load]
-pv_su = pv[mask_summer_pv]
-
-# Hiver
-conso_wi = consum_kW[mask_winter_load]
-pv_wi = pv[mask_winter_pv]
 
 for (label, conso_day, pv_day, col) in [
     ("Été — 21 juin", conso_su, pv_su, r3c1),
     ("Hiver — 21 décembre", conso_wi, pv_wi, r3c2)
 ]:
-    fig, ax = plt.subplots(figsize=(8, 3), dpi=150)
+    # Alignement PV sur index conso
+    pv_align = pv_day.reindex(conso_day.index, method="nearest")
+
+    fig, ax = plt.subplots(figsize=(8, 3))
     ax.plot(conso_day.index, conso_day.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-    ax.plot(pv_day.index, pv_day.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
+    ax.plot(conso_day.index, pv_align.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
 
-    # ✅ Aligner PV sur l'index de conso
-    pv_day_aligned = pv_day.reindex(conso_day.index, method="nearest")
-
-    # ✅ Zone autoconsommée
-    auto = np.minimum(conso_day.values, pv_day_aligned.values)
-    ax.fill_between(conso_day.index, 0, auto, hatch='//', alpha=0.22, color=COLORS["pv"], label="Autoconsommation")
-
+    # ✅ Hachurage autoconsommation
+    auto = np.minimum(conso_day.values, pv_align.values)
+    ax.fill_between(conso_day.index, 0, auto, color=COLORS["pv"], alpha=0.22, hatch="//", label="Autoconsommation")
 
     ax.set_title(label, color=COLORS["text"])
     ax.legend()
     col.pyplot(fig)
 
-
-
-
-# --- Graphiques Charge / Décharge BESS ---
+# --- Graphiques Charge / Décharge BESS (identiques à l'origine)
 r4c1, r4c2 = st.columns(2)
-
-ch_su = charged_s[mask_summer_ch]
-dis_su = discharged_s[mask_summer_dis]
-
-ch_wi = charged_s[mask_winter_ch]
-dis_wi = discharged_s[mask_winter_dis]
 
 for (label, t, ch, dis, col) in [
     ("Été — 21 juin", ch_su.index, ch_su, dis_su, r4c1),
     ("Hiver — 21 décembre", ch_wi.index, ch_wi, dis_wi, r4c2)
 ]:
-    fig2, ax2 = plt.subplots(figsize=(8, 3), dpi=150)
-    ax2.bar(t, ch.values, width=0.04, label="Charge (kWh)", color=COLORS["bess_charge"], alpha=0.9)
-    ax2.bar(t, -dis.values, width=0.04, label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.9)
+    fig2, ax2 = plt.subplots(figsize=(8, 3))
+    ax2.bar(t, ch, width=0.04, label="Charge (kWh)", color=COLORS["bess_charge"], alpha=0.9)
+    ax2.bar(t, -dis, width=0.04, label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.9)
     ax2.set_title(f"Flux batterie — {label}", color=COLORS["text"])
     ax2.legend()
     col.pyplot(fig2)
-
-
-
-
-
 
 
 # ---------- Peak shaving annuel (si marché libre) ----------
