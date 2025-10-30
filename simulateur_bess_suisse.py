@@ -318,13 +318,6 @@ idx = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
 load = load.reindex(idx, method="nearest")
 load.name = "Consommation_kW"
 
-# ✅ Assurer cohérence de résolution PV = conso
-pv = pv_series.reindex(idx, method="nearest")
-pv.name = "PV_kW"
-
-
-
-
 if has_pv:
     if pv_upload:
         pv_df = pd.read_csv(pv_upload, header=None, sep=None, engine="python")
@@ -375,13 +368,36 @@ pv_series = pv_series.dropna()
 pv_series = pv_series.sort_index()
 pv_series = pv_series[~pv_series.index.duplicated(keep="first")]
 
+# -------------------------------------------------------------
+# ✅ Détection automatique du bon profil PV (quel que soit son nom)
+# -------------------------------------------------------------
+possible_pv_names = ["pv", "pv_kW", "pv_kw", "pv_gen", "pv_profile", "pv_output"]
+
+pv_series = None
+for name in possible_pv_names:
+    if name in locals():
+        pv_series = locals()[name]
+        break
+
+if pv_series is None:
+    st.error("⚠️ Aucun profil PV trouvé. Attend : " + ", ".join(possible_pv_names))
+    st.stop()
+
+# Standardisation
+pv_series = pv_series.copy()
+pv_series.index = pd.to_datetime(pv_series.index, errors="coerce")
+pv_series = pv_series.dropna()
+pv_series = pv_series.sort_index()
+pv_series = pv_series[~pv_series.index.duplicated(keep="first")]
+
+
 
 # -------------------------------------------------------------
 # ✅ Harmonisation des séries (Conso / PV / Prix) en 15 min
 # -------------------------------------------------------------
 idx = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
 
-# Forcer année 2024 (même calendrier)
+# Forcer année 2024
 load.index = [t.replace(year=2024) for t in load.index]
 pv_series.index = [t.replace(year=2024) for t in pv_series.index]
 prices.index = [t.replace(year=2024) for t in prices.index]
@@ -393,6 +409,11 @@ prices = prices.sort_index().drop_duplicates()
 load = load.reindex(idx, method="nearest")
 pv = pv_series.reindex(idx, method="nearest")
 prices = prices.reindex(idx, method="nearest")
+
+load.name = "Consommation_kW"
+pv.name = "PV_kW"
+prices.name = "Price"
+
 
 
 # --- Récupération du profil PV ---
