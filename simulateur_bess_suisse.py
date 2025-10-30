@@ -643,36 +643,46 @@ with left_rev:
 
 
 
+
 with right_cf:
     st.markdown("### 💵 Cashflow cumulé")
+
     plt.rcParams.update({
-    "font.size": 6,
-    "axes.labelsize": 6,
-    "axes.titlesize": 6,
-    "xtick.labelsize": 6,
-    "ytick.labelsize": 6,
+        "font.size": 6,
+        "axes.labelsize": 6,
+        "axes.titlesize": 6,
+        "xtick.labelsize": 6,
+        "ytick.labelsize": 6,
     })
-    fig, ax = plt.subplots(figsize=(3,1.5))  # 50% plus petit
+
+    fig, ax = plt.subplots(figsize=(3, 1.5))
+
+    # Style bordures
     for spine in ax.spines.values():
-        spine.set_linewidth(0.4)   # bordures fines
-        spine.set_color("#CCCCCC") # gris doux
-    ax.plot(cum_years, cum_discounted, linewidth=1.3, color=COLORS["bess_charge"])
+        spine.set_linewidth(0.4)
+        spine.set_color("#CCCCCC")
+
+    # Courbe cashflow
+    ax.plot(cum_years, cum_discounted.values, linewidth=1.6, color=COLORS["bess_charge"])
+
+    # Ligne de référence (0 CHF)
     ax.axhline(0, color="#CCCCCC", linewidth=0.8, linestyle="--")
-    # Graduation tous les 50k CHF
-    ymin, ymax = ax.get_ylim()
-    step = 50000
-    ax.set_yticks(np.arange(
-    round(ymin / step) * step,
-    round(ymax / step) * step + step,
-    step
-    ))
-    # Format des nombres en ordonnée avec séparateur de milliers
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ",")))
 
+    # ✅ Graduation tous les 100'000 CHF
+    import math
+    ymin = math.floor(cum_discounted.min() / 100000) * 100000
+    ymax = math.ceil(cum_discounted.max() / 100000) * 100000
+    ax.set_yticks(np.arange(ymin, ymax + 1, 100000))
 
-    ax.set_xlabel("Années", fontsize=4.5, color=COLORS["text"])
-    ax.set_ylabel("CHF (actualisés)", fontsize=4.5, color=COLORS["text"])
-    ax.tick_params(axis="both", labelsize=4.5)
+    # ✅ Format des valeurs en espace pour milliers
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f"{int(x):,}".replace(",", " ")))
+
+    # Labels
+    ax.set_xlabel("Années", fontsize=5, color=COLORS["text"])
+    ax.set_ylabel("CHF (actualisés)", fontsize=5, color=COLORS["text"])
+    ax.tick_params(axis="both", labelsize=5)
+
+    # Affichage en SVG propre
     st.image(fig_to_svg(fig), use_container_width=True)
 
 
