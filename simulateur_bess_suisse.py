@@ -647,6 +647,10 @@ with left_rev:
 with right_cf:
     st.markdown("### 💵 Cashflow cumulé")
 
+    import numpy as np
+    cum_discounted = np.array(cum_discounted, dtype=float)
+
+
     plt.rcParams.update({
         "font.size": 6,
         "axes.labelsize": 6,
