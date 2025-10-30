@@ -672,65 +672,54 @@ with row2_col2:
     svg = fig_to_svg(fig)
     st.image(svg, width=500)
 
-# ---------- Profils été/hiver (2x2) : journées réelles extrêmes ----------
+# ---------- Profils été/hiver (2x2) — 21 juin et 21 décembre ----------
 if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_kw > 0):
-    st.markdown("### 📈 Profils — Journées réelles (max été / min hiver)")
+    st.markdown("### 📈 Profils — Journées type (21 juin / 21 décembre)")
 
-    # PV journalier → kWh par jour
-    pv_daily = (pv * 0.25).resample("D").sum()
-    pv_daily = pv_daily[pv_daily > 0]  # On ignore les jours sans production
+    # Dates fixées mais données réelles
+    summer_date = "2024-06-21"
+    winter_date = "2024-12-21"
 
-    # Sélection des journées réelles extrêmes
-    summer_day = pv_daily.idxmax()   # jour le + ensoleillé
-    winter_day = pv_daily.idxmin()   # jour le + sombre (mais non nul)
+    def extract(date):
+        return load[date], pv[date], charged_s[date], discharged_s[date]
 
-    # Fonction extraction journée complète
-    def extract_day(series, day):
-        return series.loc[str(day.date())]
+    load_su, pv_su, ch_su, dis_su = extract(summer_date)
+    load_wi, pv_wi, ch_wi, dis_wi = extract(winter_date)
 
-    conso_summer = extract_day(load, summer_day)
-    pv_summer = extract_day(pv, summer_day)
-    ch_summer = extract_day(charged_s, summer_day)
-    dis_summer = extract_day(discharged_s, summer_day)
+    # Flux instantané réseau (kW)
+    grid_su = load_su - pv_su - dis_su + ch_su
+    grid_wi = load_wi - pv_wi - dis_wi + ch_wi
 
-    conso_winter = extract_day(load, winter_day)
-    pv_winter = extract_day(pv, winter_day)
-    ch_winter = extract_day(charged_s, winter_day)
-    dis_winter = extract_day(discharged_s, winter_day)
+    # ---- Graphiques Conso / PV ----
+    col1, col2 = st.columns(2)
 
-    # Flux réseau (kW instantané)
-    grid_summer = conso_summer - pv_summer - dis_summer + ch_summer
-    grid_winter = conso_winter - pv_winter - dis_winter + ch_winter
-
-    # ---- Affichage ----
-    c1, c2 = st.columns(2)
-    for title, conso, pv_p, grid, col, date in [
-        ("Été — journée réelle", conso_summer, pv_summer, grid_summer, c1, summer_day),
-        ("Hiver — journée réelle", conso_winter, pv_winter, grid_winter, c2, winter_day)
+    for title, ld, pv_p, grid, col, date in [
+        ("Été — 21 juin", load_su, pv_su, grid_su, col1, summer_date),
+        ("Hiver — 21 décembre", load_wi, pv_wi, grid_wi, col2, winter_date),
     ]:
-        fig, ax = plt.subplots(figsize=(8,3), dpi=120)
-        ax.plot(conso.index, conso, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+        fig, ax = plt.subplots(figsize=(8, 3), dpi=140)
+        ax.plot(ld.index, ld, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
         ax.plot(pv_p.index, pv_p, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
-
-        # Soutirage / injection réseau
-        ax.plot(grid.index, grid.clip(lower=0), "--", label="Soutirage réseau (kW)", color=COLORS["grey"])
-        ax.plot(grid.index, (-grid).clip(lower=0), ":", label="Injection réseau (kW)", color=COLORS["grid_export"])
-
-        ax.set_title(f"{title} — {date.date()}")
+        ax.plot(grid.index, grid.clip(lower=0), "--", color=COLORS["grey"], label="Soutirage réseau (kW)")
+        ax.plot(grid.index, (-grid).clip(lower=0), ":", color=COLORS["grid_export"], label="Injection (kW)")
+        ax.set_title(title + f" — {date}", color=COLORS["text"])
         ax.legend()
         col.pyplot(fig)
 
-    c3, c4 = st.columns(2)
+    # ---- Graphiques Batterie (kWh) ----
+    col3, col4 = st.columns(2)
+
     for title, ch, dis, col in [
-        ("Flux batterie — Été", ch_summer, dis_summer, c3),
-        ("Flux batterie — Hiver", ch_winter, dis_winter, c4),
+        ("Flux batterie — Été (21 juin)", ch_su, dis_su, col3),
+        ("Flux batterie — Hiver (21 décembre)", ch_wi, dis_wi, col4),
     ]:
-        fig2, ax2 = plt.subplots(figsize=(8,3), dpi=120)
+        fig2, ax2 = plt.subplots(figsize=(8, 3), dpi=140)
         ax2.bar(ch.index, ch*0.25, label="Charge (kWh)", color=COLORS["bess_charge"], alpha=0.8)
         ax2.bar(dis.index, -dis*0.25, label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.8)
-        ax2.set_title(title)
+        ax2.set_title(title, color=COLORS["text"])
         ax2.legend()
         col.pyplot(fig2)
+
 
 
 
