@@ -723,6 +723,10 @@ for (label, conso_day, pv_day, ch_day, dis_day, col) in [
 
     ax.set_title(label, color=COLORS["text"])
     ax.legend()
+
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    
     col.pyplot(fig)
 
 
@@ -739,6 +743,8 @@ for (label, t, ch, dis, col) in [
     ax2.bar(t, -dis, width=0.04, label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.9)
     ax2.set_title(f"Flux batterie — {label}", color=COLORS["text"])
     ax2.legend()
+    ax2.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
     col.pyplot(fig2)
 
 
