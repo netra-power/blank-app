@@ -207,25 +207,35 @@ with st.sidebar:
             st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
             st.stop()
     
-            # ✅ Tri + nettoyage
-            consum_kW = consum_kW.sort_index()
-            consum_kW = consum_kW[consum_kW.index.notna()]
-            consum_kW = consum_kW.astype(float)
-            
-            # ✅ Reprojection de toutes les dates sur 2024 (en conservant saison + heures)
-            consum_kW.index = consum_kW.index.map(lambda t: t.replace(year=2024))
-            
-            # ✅ Tri à nouveau (obligatoire après replace-year)
-            consum_kW = consum_kW.sort_index()
-            
-            # ✅ Supprimer les doublons créés par le changement d'année
-            consum_kW = consum_kW[~consum_kW.index.duplicated(keep="first")]
-            
-            # ✅ Mise sur grille uniforme 15 minutes (année complète)
-            idx_15m = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
-            consum_kW = consum_kW.reindex(idx_15m, method="nearest")
+            # ✅ Tri + suppression des doublons
+        consum_kW = consum_kW.sort_index()
+        consum_kW = consum_kW[~consum_kW.index.duplicated(keep="first")]
 
+        # ✅ Supprimer toutes les valeurs où la date est NaT (important)
+        consum_kW = consum_kW[consum_kW.index.notna()]
 
+    
+        # ✅ Détection du pas de temps automatique
+        dt_seconds = (
+            consum_kW.index.to_series().diff().dropna().dt.total_seconds().mode()[0]
+        )
+    
+        if dt_seconds == 900:
+            st.info("⏱️ Pas de temps détecté : **15 min** ✅")
+        elif dt_seconds == 1800:
+            st.warning("⏱️ Pas de temps détecté : **30 min** → conversion en 15 min")
+        elif dt_seconds == 3600:
+            st.warning("⏱️ Pas de temps détecté : **1h** → conversion en 15 min")
+        else:
+            st.warning(f"⏱️ Pas de temps irrégulier ({int(dt_seconds)} sec) → conversion en 15 min")
+
+        # ✅ S'assurer que les valeurs sont bien des floats
+        consum_kW = consum_kW.astype(float)
+
+    
+        # ✅ Mise sur grille 15 min uniforme
+        idx_15m = pd.date_range(consum_kW.index.min(), consum_kW.index.max(), freq="15T")
+        consum_kW = consum_kW.reindex(idx_15m, method="nearest")
         
         # ✅ Calcul consommation annuelle réelle à partir du profil importé
         annual_kwh_from_csv = (consum_kW * 0.25).sum()
@@ -303,20 +313,9 @@ idx = year_hours(2024)
 # ✅ Toujours utiliser consum_kW (qu'il vienne du CSV ou du profil synthétique)
 load = consum_kW.copy()
 
-# ✅ Toujours trier et enlever les doublons avant reindex
-load = load.sort_index()
-load = load[~load.index.duplicated(keep="first")]
-
-# --- Sécurisation du profil avant recalage ---
-# (tri, suppression doublons, nettoyage, obligatoire)
-load = load.sort_index()
-load = load[load.index.notna()]
-load = load[~load.index.duplicated(keep="first")]
-
-# --- Mise sur grille annuelle 15 min ---
-idx = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
+# ✅ Harmonisation du pas de temps sur l’année complète
 load = load.reindex(idx, method="nearest")
-load.name = "Consommation_kW"
+
 
 if has_pv:
     if pv_upload:
@@ -344,143 +343,7 @@ if marche_libre == "Oui":
         t = np.arange(8760)
         prices = pd.Series(0.12 + 0.03*np.sin(2*np.pi*(t%24)/24), index=idx)
 else:
-    prices = pd.Series(np.full(len(idx), price_buy_fixed), index=idx)
-
-# -------------------------------------------------------------
-# ✅ Détection automatique du bon profil PV (quel que soit son nom)
-# -------------------------------------------------------------
-possible_pv_names = ["pv", "pv_kW", "pv_kw", "pv_gen", "pv_profile", "pv_output"]
-
-pv_series = None
-for name in possible_pv_names:
-    if name in locals():
-        pv_series = locals()[name]
-        break
-
-if pv_series is None:
-    st.error("⚠️ Aucun profil PV trouvé. Attend : " + ", ".join(possible_pv_names))
-    st.stop()
-
-# Normalisation PV
-pv_series = pv_series.copy()
-pv_series.index = pd.to_datetime(pv_series.index, errors="coerce")
-pv_series = pv_series.dropna()
-pv_series = pv_series.sort_index()
-pv_series = pv_series[~pv_series.index.duplicated(keep="first")]
-
-# -------------------------------------------------------------
-# ✅ Détection automatique du bon profil PV (quel que soit son nom)
-# -------------------------------------------------------------
-possible_pv_names = ["pv", "pv_kW", "pv_kw", "pv_gen", "pv_profile", "pv_output"]
-
-pv_series = None
-for name in possible_pv_names:
-    if name in locals():
-        pv_series = locals()[name]
-        break
-
-if pv_series is None:
-    st.error("⚠️ Aucun profil PV trouvé. Attend : " + ", ".join(possible_pv_names))
-    st.stop()
-
-# Standardisation
-pv_series = pv_series.copy()
-pv_series.index = pd.to_datetime(pv_series.index, errors="coerce")
-pv_series = pv_series.dropna()
-pv_series = pv_series.sort_index()
-pv_series = pv_series[~pv_series.index.duplicated(keep="first")]
-
-# -------------------------------------------------------------
-# ✅ Détection automatique du bon profil PV (quel que soit son nom)
-# -------------------------------------------------------------
-possible_pv_names = ["pv", "pv_kW", "pv_kw", "pv_gen", "pv_profile", "pv_output"]
-
-pv_series = None
-for name in possible_pv_names:
-    if name in locals():
-        pv_series = locals()[name]
-        break
-
-if pv_series is None:
-    st.error("⚠️ Aucun profil PV trouvé. Attend : " + ", ".join(possible_pv_names))
-    st.stop()
-
-# Standardisation PV
-def _clean_series(s):
-    s = s.copy()
-    s.index = pd.to_datetime(s.index, errors="coerce")
-    s = s.dropna()
-    s = s.sort_index()
-    s = s[~s.index.duplicated(keep="first")]
-    return s
-
-pv_series = _clean_series(pv_series)
-
-
-# -------------------------------------------------------------
-# ✅ Harmonisation des séries (Conso / PV / Prix) en 15 min
-# -------------------------------------------------------------
-idx = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
-
-# Forcer année 2024
-load.index = [t.replace(year=2024) for t in load.index]
-pv_series.index = [t.replace(year=2024) for t in pv_series.index]
-prices.index = [t.replace(year=2024) for t in prices.index]
-
-load = load.sort_index().drop_duplicates()
-pv_series = pv_series.sort_index().drop_duplicates()
-prices = prices.sort_index().drop_duplicates()
-
-load = load.reindex(idx, method="nearest")
-pv = pv_series.reindex(idx, method="nearest")
-prices = prices.reindex(idx, method="nearest")
-
-load.name = "Consommation_kW"
-pv.name = "PV_kW"
-prices.name = "Price"
-
-
-
-# --- Récupération du profil PV ---
-possible_pv_names = ["pv", "pv_kW", "pv_gen", "pv_profile", "pv_kw", "pv_output"]
-
-pv_series = None
-for name in possible_pv_names:
-    if name in locals():
-        pv_series = locals()[name]
-        break
-
-if pv_series is None:
-    st.error("⚠️ Impossible de trouver le profil PV. Assure-toi qu'il existe sous l'un des noms : " + ", ".join(possible_pv_names))
-    st.stop()
-
-pv_series = _clean_series(pv_series)
-# ✅ On crée la variable standardisée 'pv' utilisée partout ensuite
-pv = pv_series.copy()
-
-
-load = _clean_series(load)
-prices = _clean_series(prices)
-
-# Forcer l’année 2024 (conserve saison + heures)
-load.index = [t.replace(year=2024) for t in load.index]
-pv_series.index = [t.replace(year=2024) for t in pv_series.index]
-prices.index = [t.replace(year=2024) for t in prices.index]
-
-load = _clean_series(load)
-pv_series = _clean_series(pv_series)
-prices = _clean_series(prices)
-
-# Mise sur grille uniforme 15 min
-load = load.reindex(idx, method="nearest")
-pv = pv_series.reindex(idx, method="nearest")
-prices = prices.reindex(idx, method="nearest")
-
-load.name = "Consommation_kW"
-pv.name = "PV_kW"
-prices.name = "Price"
-
-
+    prices = pd.Series(np.full(8760, price_buy_fixed), index=idx)
 
 # -----------------------------
 # Simulation + dispatch (distinction charge PV / charge réseau)
@@ -643,51 +506,36 @@ with left_rev:
 
 
 
-
 with right_cf:
     st.markdown("### 💵 Cashflow cumulé")
-
-    import numpy as np
-    cum_discounted = np.array(cum_discounted, dtype=float)
-
-
     plt.rcParams.update({
-        "font.size": 6,
-        "axes.labelsize": 6,
-        "axes.titlesize": 6,
-        "xtick.labelsize": 6,
-        "ytick.labelsize": 6,
+    "font.size": 6,
+    "axes.labelsize": 6,
+    "axes.titlesize": 6,
+    "xtick.labelsize": 6,
+    "ytick.labelsize": 6,
     })
-
-    fig, ax = plt.subplots(figsize=(3, 1.5))
-
-    # Style bordures
+    fig, ax = plt.subplots(figsize=(3,1.5))  # 50% plus petit
     for spine in ax.spines.values():
-        spine.set_linewidth(0.4)
-        spine.set_color("#CCCCCC")
-
-    # Courbe cashflow
-    ax.plot(cum_years, np.array(cum_discounted), linewidth=1.6, color=COLORS["bess_charge"])
-
-
-    # Ligne de référence (0 CHF)
+        spine.set_linewidth(0.4)   # bordures fines
+        spine.set_color("#CCCCCC") # gris doux
+    ax.plot(cum_years, cum_discounted, linewidth=1.3, color=COLORS["bess_charge"])
     ax.axhline(0, color="#CCCCCC", linewidth=0.8, linestyle="--")
+    # Graduation tous les 50k CHF
+    ymin, ymax = ax.get_ylim()
+    step = 50000
+    ax.set_yticks(np.arange(
+    round(ymin / step) * step,
+    round(ymax / step) * step + step,
+    step
+    ))
+    # Format des nombres en ordonnée avec séparateur de milliers
+    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: format(int(x), ",")))
 
-    # ✅ Graduation tous les 100'000 CHF
-    import math
-    ymin = math.floor(cum_discounted.min() / 100000) * 100000
-    ymax = math.ceil(cum_discounted.max() / 100000) * 100000
-    ax.set_yticks(np.arange(ymin, ymax + 1, 100000))
 
-    # ✅ Format des valeurs en espace pour milliers
-    ax.yaxis.set_major_formatter(FuncFormatter(lambda x, p: f"{int(x):,}".replace(",", " ")))
-
-    # Labels
-    ax.set_xlabel("Années", fontsize=5, color=COLORS["text"])
-    ax.set_ylabel("CHF (actualisés)", fontsize=5, color=COLORS["text"])
-    ax.tick_params(axis="both", labelsize=5)
-
-    # Affichage en SVG propre
+    ax.set_xlabel("Années", fontsize=4.5, color=COLORS["text"])
+    ax.set_ylabel("CHF (actualisés)", fontsize=4.5, color=COLORS["text"])
+    ax.tick_params(axis="both", labelsize=4.5)
     st.image(fig_to_svg(fig), use_container_width=True)
 
 
@@ -824,109 +672,45 @@ with row2_col2:
     svg = fig_to_svg(fig)
     st.image(svg, width=500)
 
-# -------------------------------------------------------------
-# 📈 Profils — Journées types été / hiver (21 juin & 21 décembre)
-# -------------------------------------------------------------
-st.markdown("## 📈 Profils — Journées types été / hiver")
-
-def day_slice(date_str):
-    d0 = pd.Timestamp(date_str)
-    return (idx >= d0) & (idx < d0 + pd.Timedelta(days=1))
-
-mask_summer = day_slice("2024-06-21")
-mask_winter = day_slice("2024-12-21")
-
-# --- Extraction journalière ---
-conso_day_summer = load[mask_summer]
-conso_day_winter = load[mask_winter]
-
-pv_day_summer = pv[mask_summer]
-pv_day_winter = pv[mask_winter]
-
-charge_day_summer = charged_s[mask_summer]
-discharge_day_summer = discharged_s[mask_summer]
-
-charge_day_winter = charged_s[mask_winter]
-discharge_day_winter = discharged_s[mask_winter]
-# --- Conversion Batterie kW → kWh (pas de temps = 15 min) ---
-dt = 0.25
-charge_day_summer_kwh = charge_day_summer * dt
-discharge_day_summer_kwh = discharge_day_summer * dt
-charge_day_winter_kwh = charge_day_winter * dt
-discharge_day_winter_kwh = discharge_day_winter * dt
-
-# --- Soutirage et Injection réseau ---
-grid_summer   = (conso_day_summer - pv_day_summer - discharge_day_summer + charge_day_summer).clip(lower=0)
-grid_winter   = (conso_day_winter - pv_day_winter - discharge_day_winter + charge_day_winter).clip(lower=0)
-
-injection_summer = (pv_day_summer - conso_day_summer - charge_day_summer + discharge_day_summer).clip(lower=0)
-injection_winter = (pv_day_winter - conso_day_winter - charge_day_winter + discharge_day_winter).clip(lower=0)
-
-# --- Conversion index → heures ---
-def to_hours(series):
-    return np.array([t.hour + t.minute/60 for t in series.index])
-
-x_summer = to_hours(conso_day_summer)
-x_winter = to_hours(conso_day_winter)
-
-def format_time_axis(ax):
-    ax.set_xticks([0, 6, 12, 18, 24])
-    ax.set_xticklabels(["00:00", "06:00", "12:00", "18:00", "24:00"])
-    ax.set_xlim(0, 24)
 
 
-# --- AFFICHAGE ---
-fig, axes = plt.subplots(2, 2, figsize=(12, 7), dpi=300)
+# ---------- Profils été/hiver (2x2) ----------
+if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_kw > 0):
+    st.markdown("### 📈 Profils — Journées type été / hiver")
 
-# Été — Conso / PV / Réseau + autoconsommation
-axes[0,0].plot(x_summer, conso_day_summer, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-axes[0,0].plot(x_summer, pv_day_summer, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
-axes[0,0].plot(x_summer, grid_summer, label="Soutirage réseau (kW)", color=COLORS["grid_import"], linestyle="--", linewidth=1.8)
-axes[0,0].plot(x_summer, injection_summer, label="Injection réseau (kW)", color=COLORS["grid_export"], linestyle=":", linewidth=1.8)
+    def day_slice(date_str):
+        d0 = pd.Timestamp(date_str)
+        return (idx >= d0) & (idx < d0 + pd.Timedelta(days=1))
 
-# Zone autoconsommée (hachurée)
-axes[0,0].fill_between(x_summer, 0, np.minimum(conso_day_summer, pv_day_summer),
-                       color=COLORS["pv"], alpha=0.25, hatch="///", edgecolor=COLORS["pv"])
+    mask_summer = day_slice("2024-07-15")
+    mask_winter = day_slice("2024-01-15")
 
-axes[0,0].set_title("Été — 21 juin")
-format_time_axis(axes[0,0])
-axes[0,0].legend()
+    r3c1, r3c2 = st.columns(2)
+    for label, mask, col in [("Été (15 juillet)", mask_summer, r3c1), ("Hiver (15 janvier)", mask_winter, r3c2)]:
+        lday = load[mask].values
+        pvday = pv[mask].values
+        tday = load[mask].index
 
+        fig, ax = plt.subplots(figsize=(8,3))
+        ax.plot(tday, lday, label="Conso (kWh/h)", color=COLORS["load"], linewidth=1.8)
+        ax.plot(tday, pvday, label="PV (kWh/h)", color=COLORS["pv"], linewidth=1.6)
+        auto_day = np.minimum(lday, pvday)
+        ax.fill_between(tday, 0, auto_day, hatch='//', alpha=0.18, color=COLORS["pv"], label="Autoconsommation")
+        ax.set_title(f"Conso vs PV — {label}", color=COLORS["text"])
+        ax.legend()
+        col.pyplot(fig)
 
-# Hiver — Conso / PV / Réseau + autoconsommation
-axes[0,1].plot(x_winter, conso_day_winter, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-axes[0,1].plot(x_winter, pv_day_winter, label="PV (kW)", color=COLORS["pv"], linewidth=1.8)
-axes[0,1].plot(x_winter, grid_winter, label="Soutirage réseau (kW)", color=COLORS["grid_import"], linestyle="--", linewidth=1.8)
-axes[0,1].plot(x_winter, injection_winter, label="Injection réseau (kW)", color=COLORS["grid_export"], linestyle=":", linewidth=1.8)
-
-axes[0,1].fill_between(x_winter, 0, np.minimum(conso_day_winter, pv_day_winter),
-                       color=COLORS["pv"], alpha=0.25, hatch="///", edgecolor=COLORS["pv"])
-
-axes[0,1].set_title("Hiver — 21 décembre")
-format_time_axis(axes[0,1])
-axes[0,1].legend()
-
-
-# Été — Batterie (kWh)
-axes[1,0].bar(x_summer, charge_day_summer_kwh, label="Charge (kWh)", color=COLORS["bess_charge"], alpha=0.6)
-axes[1,0].bar(x_summer, -discharge_day_summer_kwh, label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.6)
-axes[1,0].set_title("Flux batterie — Été (21 juin)")
-format_time_axis(axes[1,0])
-axes[1,0].legend()
-
-
-# Hiver — Batterie (kWh)
-axes[1,1].bar(x_winter, charge_day_winter_kwh, label="Charge (kWh)", color=COLORS["bess_charge"], alpha=0.6)
-axes[1,1].bar(x_winter, -discharge_day_winter_kwh, label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.6)
-axes[1,1].set_title("Flux batterie — Hiver (21 décembre)")
-format_time_axis(axes[1,1])
-axes[1,1].legend()
-
-
-st.image(fig_to_svg(fig), use_container_width=True)
-
-
-
+    r4c1, r4c2 = st.columns(2)
+    for label, mask, col in [("Été (15 juillet)", mask_summer, r4c1), ("Hiver (15 janvier)", mask_winter, r4c2)]:
+        tday = load[mask].index
+        ch_day = charged_s[mask].values
+        dis_day = discharged_s[mask].values
+        fig2, ax2 = plt.subplots(figsize=(8,3))
+        ax2.bar(tday, ch_day, width=0.03, label="Charge (kWh/h)", color=COLORS["bess_charge"], alpha=0.9)
+        ax2.bar(tday, dis_day, width=0.03, label="Décharge (kWh/h)", color=COLORS["bess_discharge"], alpha=0.9)
+        ax2.set_title(f"Flux batterie — {label}", color=COLORS["text"])
+        ax2.legend()
+        col.pyplot(fig2)
 
 # ---------- Peak shaving annuel (si marché libre) ----------
 if ("bâtiment" in system_type.lower()) and (marche_libre == "Oui"):
