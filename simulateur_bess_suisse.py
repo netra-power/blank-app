@@ -319,7 +319,8 @@ load = load.reindex(idx, method="nearest")
 load.name = "Consommation_kW"
 
 # ✅ Assurer cohérence de résolution PV = conso
-pv = pv.reindex(idx, method="nearest")
+pv = pv_series.reindex(idx, method="nearest")
+
 
 
 
