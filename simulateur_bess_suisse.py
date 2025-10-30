@@ -711,8 +711,13 @@ for (label, conso_day, pv_day, col) in [
     ax.plot(conso_day.index, conso_day.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
     ax.plot(pv_day.index, pv_day.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
 
-    auto = np.minimum(conso_day.values, pv_day.values)
+    # ✅ Aligner PV sur l'index de conso
+    pv_day_aligned = pv_day.reindex(conso_day.index, method="nearest")
+
+    # ✅ Zone autoconsommée
+    auto = np.minimum(conso_day.values, pv_day_aligned.values)
     ax.fill_between(conso_day.index, 0, auto, hatch='//', alpha=0.22, color=COLORS["pv"], label="Autoconsommation")
+
 
     ax.set_title(label, color=COLORS["text"])
     ax.legend()
