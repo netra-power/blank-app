@@ -364,16 +364,21 @@ def _clean_series(s):
     s = s[~s.index.duplicated(keep="first")]
     return s
 
-# Résoudre la série PV selon le nom présent dans ton code
-if 'pv' in locals():
-    pv_series = _clean_series(pv)
-elif 'pv_kW' in locals():
-    pv_series = _clean_series(pv_kW)
-elif 'pv_gen' in locals():
-    pv_series = _clean_series(pv_gen)
-else:
-    st.error("⚠️ Aucun profil PV trouvé. Attendu : pv, pv_kW ou pv_gen.")
+# --- Récupération du profil PV ---
+possible_pv_names = ["pv", "pv_kW", "pv_gen", "pv_profile", "pv_kw", "pv_output"]
+
+pv_series = None
+for name in possible_pv_names:
+    if name in locals():
+        pv_series = locals()[name]
+        break
+
+if pv_series is None:
+    st.error("⚠️ Impossible de trouver le profil PV. Assure-toi qu'il existe sous l'un des noms : " + ", ".join(possible_pv_names))
     st.stop()
+
+pv_series = _clean_series(pv_series)
+
 
 load = _clean_series(load)
 prices = _clean_series(prices)
