@@ -663,7 +663,8 @@ with right_cf:
         spine.set_color("#CCCCCC")
 
     # Courbe cashflow
-    ax.plot(cum_years, cum_discounted.values, linewidth=1.6, color=COLORS["bess_charge"])
+    ax.plot(cum_years, np.array(cum_discounted), linewidth=1.6, color=COLORS["bess_charge"])
+
 
     # Ligne de référence (0 CHF)
     ax.axhline(0, color="#CCCCCC", linewidth=0.8, linestyle="--")
