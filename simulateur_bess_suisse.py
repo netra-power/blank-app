@@ -378,6 +378,8 @@ if pv_series is None:
     st.stop()
 
 pv_series = _clean_series(pv_series)
+# ✅ On crée la variable standardisée 'pv' utilisée partout ensuite
+pv = pv_series.copy()
 
 
 load = _clean_series(load)
