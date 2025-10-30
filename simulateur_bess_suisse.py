@@ -673,62 +673,66 @@ with row2_col2:
     st.image(svg, width=500)
 
 
-
-# ---------- Profils été/hiver (2x2) — 21 juin / 21 décembre (année indifférente) ----------
+# ---------- Profils été/hiver (2x2) — 21 juin / 21 décembre (année indifférente, propre) ----------
 if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_kw > 0):
     st.markdown("### 📈 Profils — Journées type (21 juin / 21 décembre)")
 
     import numpy as np
     import pandas as pd
 
-    # Trouve la journée demandée (mois/jour), peu importe l'année disponible
-    def get_day_slice_any_year(series: pd.Series, month: int, day: int):
-        # Index normalisé en dates
-        idx_norm = pd.to_datetime(series.index).normalize()
-        unique_days = pd.Index(idx_norm.unique())
-        # Candidats correspondant au mois/jour
-        candidates = unique_days[(unique_days.month == month) & (unique_days.day == day)]
-        if len(candidates) == 0:
-            return None, None  # pas trouvé
-        d = candidates.min()  # s'il y a plusieurs années, on prend la première
-        return d, series.loc[slice(d, d + pd.Timedelta(days=1))]
+    # Helpers robustes
+    def _first_day_any_year(series: pd.Series, month: int, day: int):
+        """Retourne le premier jour (Timestamp à 00:00) de la forme mm/jj présent dans 'series' (peu importe l'année)."""
+        idx = pd.to_datetime(series.index)
+        days = idx.normalize()
+        sel = days[(days.month == month) & (days.day == day)]
+        if len(sel) == 0:
+            return None
+        return sel.min()
 
-    # 21 juin
-    d_su, load_su = get_day_slice_any_year(load, 6, 21)
-    _, pv_su      = get_day_slice_any_year(pv, 6, 21)
-    _, ch_su      = get_day_slice_any_year(charged_s, 6, 21)
-    _, dis_su     = get_day_slice_any_year(discharged_s, 6, 21)
+    def _slice_exact_day(series: pd.Series, day0: pd.Timestamp):
+        """Sélectionne exactement [day0, day0+1j) sans inclure le lendemain."""
+        idx = pd.to_datetime(series.index)
+        mask = (idx >= day0) & (idx < day0 + pd.Timedelta(days=1))
+        return series.loc[mask]
 
-    # 21 décembre
-    d_wi, load_wi = get_day_slice_any_year(load, 12, 21)
-    _, pv_wi      = get_day_slice_any_year(pv, 12, 21)
-    _, ch_wi      = get_day_slice_any_year(charged_s, 12, 21)
-    _, dis_wi     = get_day_slice_any_year(discharged_s, 12, 21)
+    def _dt_hours(x_index) -> float:
+        """Pas de temps en heures (ex: 0.25 pour 15 min)."""
+        if len(x_index) > 1:
+            return (x_index[1] - x_index[0]).total_seconds() / 3600.0
+        return 0.25
 
-    # Messages si dates introuvables
-    if (d_su is None) or (d_wi is None):
-        missing = []
-        if d_su is None: missing.append("21 juin")
-        if d_wi is None: missing.append("21 décembre")
+    # Cherche la date dans PV (plus sûr) ; si absente, essaie la conso
+    d_su = _first_day_any_year(pv, 6, 21)  or _first_day_any_year(load, 6, 21)
+    d_wi = _first_day_any_year(pv, 12, 21) or _first_day_any_year(load, 12, 21)
+
+    missing = []
+    if d_su is None: missing.append("21 juin")
+    if d_wi is None: missing.append("21 décembre")
+    if missing:
         st.warning("⚠️ Journée introuvable dans les données : " + ", ".join(missing) + ".")
     else:
-        # Pas de temps (pour convertir kW → kWh)
-        def step_hours(s):
-            if len(s.index) > 1:
-                return (s.index[1] - s.index[0]).total_seconds() / 3600.0
-            return 0.25  # fallback
-        dt_su = step_hours(load_su)
-        dt_wi = step_hours(load_wi)
+        # ---- Été (21 juin) ----
+        load_su = _slice_exact_day(load, d_su)
+        pv_su   = _slice_exact_day(pv, d_su)
+        ch_su   = _slice_exact_day(charged_s, d_su)
+        dis_su  = _slice_exact_day(discharged_s, d_su)
 
-        # Flux réseau (kW instantané)
+        # ---- Hiver (21 décembre) ----
+        load_wi = _slice_exact_day(load, d_wi)
+        pv_wi   = _slice_exact_day(pv, d_wi)
+        ch_wi   = _slice_exact_day(charged_s, d_wi)
+        dis_wi  = _slice_exact_day(discharged_s, d_wi)
+
+        # Flux réseau instantané (kW)
         grid_su = load_su - pv_su - dis_su + ch_su
         grid_wi = load_wi - pv_wi - dis_wi + ch_wi
 
-        # ---------- Conso / PV + hachure autoconsommation ----------
-        col1, col2 = st.columns(2)
-        for title, ld, pv_p, grid, date_found, col in [
-            ("Été — 21 juin",      load_su, pv_su, grid_su, d_su, col1),
-            ("Hiver — 21 décembre", load_wi, pv_wi, grid_wi, d_wi, col2),
+        # ---- Graphiques Conso / PV (hachure autoconsommation) ----
+        c1, c2 = st.columns(2)
+        for title, ld, pv_p, grid, day_found, col in [
+            ("Été — 21 juin",      load_su, pv_su, grid_su, d_su, c1),
+            ("Hiver — 21 décembre", load_wi, pv_wi, grid_wi, d_wi, c2),
         ]:
             fig, ax = plt.subplots(figsize=(8, 3), dpi=140)
 
@@ -736,28 +740,37 @@ if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_
             ax.plot(ld.index,   ld.values,   label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
             ax.plot(pv_p.index, pv_p.values, label="PV (kW)",    color=COLORS["pv"],   linewidth=1.8)
 
-            # Hachure autoconsommation (min(conso, PV))
+            # Hachure autoconsommation
             auto = np.minimum(ld.values, pv_p.values)
             ax.fill_between(ld.index, 0, auto, color=COLORS["pv"], alpha=0.35, hatch="//", label="Autoconsommation")
 
-            # Réseau : import / export
-            ax.plot(grid.index, grid.clip(lower=0).values,  "--", color=COLORS["grid_import"], label="Soutirage (kW)")
-            ax.plot(grid.index, (-grid).clip(lower=0).values, ":", color=COLORS["grid_export"], label="Injection (kW)")
+            # Réseau import/export
+            ax.plot(grid.index,  grid.clip(lower=0).values,   "--", color=COLORS["grid_import"], label="Soutirage (kW)")
+            ax.plot(grid.index, (-grid).clip(lower=0).values, ":",  color=COLORS["grid_export"], label="Injection (kW)")
 
-            ax.set_title(f"{title} — {date_found.date()}", color=COLORS["text"])
+            ax.set_title(f"{title} — {day_found.date()}", color=COLORS["text"])
             ax.legend()
             col.pyplot(fig)
 
-        # ---------- Batterie (kWh sur le pas de temps) ----------
-        col3, col4 = st.columns(2)
-        for title, ch, dis, dt, col in [
-            ("Flux batterie — Été (21 juin)",  ch_su, dis_su, dt_su, col3),
-            ("Flux batterie — Hiver (21 décembre)", ch_wi, dis_wi, dt_wi, col4),
+        # ---- Graphiques Batterie (kWh par pas) — barres propres, non superposées ----
+        c3, c4 = st.columns(2)
+        for title, ch, dis, day_found, col in [
+            ("Flux batterie — Été (21 juin)",  ch_su,  dis_su,  d_su, c3),
+            ("Flux batterie — Hiver (21 décembre)", ch_wi, dis_wi, d_wi, c4),
         ]:
+            # Energie par pas (kWh) = kW * pas(h)
+            dt_h = _dt_hours(ch.index) if len(ch) else _dt_hours(dis.index)
+            en_ch  = ch.values  * dt_h
+            en_dis = -dis.values * dt_h  # négatif pour tracer vers le bas
+
+            # Largeur des barres = durée du pas en fraction de jour
+            width = dt_h / 24.0
+
             fig2, ax2 = plt.subplots(figsize=(8, 3), dpi=140)
-            ax2.bar(ch.index,  (ch.values  * dt), label="Charge (kWh)",   color=COLORS["bess_charge"],   alpha=0.8)
-            ax2.bar(dis.index, (-dis.values * dt), label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.8)
-            ax2.set_title(title, color=COLORS["text"])
+            # align='edge' évite l'effet de superposition "bizarre"
+            ax2.bar(ch.index,  en_ch,  width=width, align="edge", label="Charge (kWh)",   color=COLORS["bess_charge"],   alpha=0.9)
+            ax2.bar(dis.index, en_dis, width=width, align="edge", label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.9)
+            ax2.set_title(title + f" — {day_found.date()}", color=COLORS["text"])
             ax2.legend()
             col.pyplot(fig2)
 
