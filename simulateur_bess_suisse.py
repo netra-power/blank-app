@@ -390,6 +390,31 @@ pv_series = pv_series.dropna()
 pv_series = pv_series.sort_index()
 pv_series = pv_series[~pv_series.index.duplicated(keep="first")]
 
+# -------------------------------------------------------------
+# ✅ Détection automatique du bon profil PV (quel que soit son nom)
+# -------------------------------------------------------------
+possible_pv_names = ["pv", "pv_kW", "pv_kw", "pv_gen", "pv_profile", "pv_output"]
+
+pv_series = None
+for name in possible_pv_names:
+    if name in locals():
+        pv_series = locals()[name]
+        break
+
+if pv_series is None:
+    st.error("⚠️ Aucun profil PV trouvé. Attend : " + ", ".join(possible_pv_names))
+    st.stop()
+
+# Standardisation PV
+def _clean_series(s):
+    s = s.copy()
+    s.index = pd.to_datetime(s.index, errors="coerce")
+    s = s.dropna()
+    s = s.sort_index()
+    s = s[~s.index.duplicated(keep="first")]
+    return s
+
+pv_series = _clean_series(pv_series)
 
 
 # -------------------------------------------------------------
