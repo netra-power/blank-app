@@ -693,27 +693,38 @@ pv_wi = pv[mask_winter]
 ch_wi = charged_s[mask_winter]
 dis_wi = discharged_s[mask_winter]
 
-# --- Graphiques Conso + PV ---
+# --- Graphiques Conso + PV + Réseau ---
 r3c1, r3c2 = st.columns(2)
 
-for (label, conso_day, pv_day, col) in [
-    ("Été — 21 juin", conso_su, pv_su, r3c1),
-    ("Hiver — 21 décembre", conso_wi, pv_wi, r3c2)
+for (label, conso_day, pv_day, ch_day, dis_day, col) in [
+    ("Été — 21 juin", conso_su, pv_su, ch_su, dis_su, r3c1),
+    ("Hiver — 21 décembre", conso_wi, pv_wi, ch_wi, dis_wi, r3c2)
 ]:
-    # ✅ Alignement indispensable des index
+    # ✅ Alignement index PV / Conso
     pv_day = pv_day.reindex(conso_day.index, method="nearest")
 
+    # ✅ Calcul réseau (import / export)
+    grid_import = np.maximum(conso_day - pv_day - dis_day + ch_day, 0)
+    grid_export = np.maximum(pv_day - conso_day - ch_day + dis_day, 0)
+
     fig, ax = plt.subplots(figsize=(8, 3), dpi=150)
+
+    # Conso & PV
     ax.plot(conso_day.index, conso_day.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
     ax.plot(conso_day.index, pv_day.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
 
-    # ✅ Zone autoconsommée réaliste
+    # Autoconsommation (hachurée)
     auto = np.minimum(conso_day.values, pv_day.values)
     ax.fill_between(conso_day.index, 0, auto, color=COLORS["pv"], alpha=0.22, hatch="//", label="Autoconsommation")
+
+    # Réseau
+    ax.plot(conso_day.index, grid_import.values, linestyle="--", linewidth=1.4, color=COLORS["grid_import"], label="Soutirage réseau (kW)")
+    ax.plot(conso_day.index, grid_export.values, linestyle=":", linewidth=1.4, color=COLORS["grid_export"], label="Injection réseau (kW)")
 
     ax.set_title(label, color=COLORS["text"])
     ax.legend()
     col.pyplot(fig)
+
 
 
 # --- Graphiques Charge / Décharge BESS (identiques à l'origine)
