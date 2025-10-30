@@ -351,19 +351,51 @@ if marche_libre == "Oui":
 else:
     prices = pd.Series(np.full(len(idx), price_buy_fixed), index=idx)
 
-# --- Harmonisation des profils sur la grille 15 min annuelle ---
+# ---------------------------------------------------------
+# ✅ Harmonisation des séries (Conso / PV / Prix) en 15 min
+# ---------------------------------------------------------
 idx = pd.date_range("2024-01-01", "2024-12-31 23:45", freq="15T")
 
-load = load.sort_index()
-load = load[~load.index.duplicated(keep="first")]
+def _clean_series(s):
+    s = s.copy()
+    s.index = pd.to_datetime(s.index, errors="coerce")
+    s = s.dropna()
+    s = s.sort_index()
+    s = s[~s.index.duplicated(keep="first")]
+    return s
+
+# Résoudre la série PV selon le nom présent dans ton code
+if 'pv' in locals():
+    pv_series = _clean_series(pv)
+elif 'pv_kW' in locals():
+    pv_series = _clean_series(pv_kW)
+elif 'pv_gen' in locals():
+    pv_series = _clean_series(pv_gen)
+else:
+    st.error("⚠️ Aucun profil PV trouvé. Attendu : pv, pv_kW ou pv_gen.")
+    st.stop()
+
+load = _clean_series(load)
+prices = _clean_series(prices)
+
+# Forcer l’année 2024 (conserve saison + heures)
+load.index = [t.replace(year=2024) for t in load.index]
+pv_series.index = [t.replace(year=2024) for t in pv_series.index]
+prices.index = [t.replace(year=2024) for t in prices.index]
+
+load = _clean_series(load)
+pv_series = _clean_series(pv_series)
+prices = _clean_series(prices)
+
+# Mise sur grille uniforme 15 min
 load = load.reindex(idx, method="nearest")
-
-pv = pv.sort_index()
-pv = pv[~pv.index.duplicated(keep="first")]
-pv = pv.reindex(idx, method="nearest")
-
-prices = prices.sort_index()
+pv = pv_series.reindex(idx, method="nearest")
 prices = prices.reindex(idx, method="nearest")
+
+load.name = "Consommation_kW"
+pv.name = "PV_kW"
+prices.name = "Price"
+
 
 
 # -----------------------------
