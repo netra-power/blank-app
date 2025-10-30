@@ -673,106 +673,41 @@ with row2_col2:
     st.image(svg, width=500)
 
 
-# ---------- Profils été/hiver (2x2) — 21 juin / 21 décembre (année indifférente, propre) ----------
-if ("bâtiment" in system_type.lower()) and has_pv and (batt_kwh > 0) and (batt_kw > 0):
-    st.markdown("### 📈 Profils — Journées type (21 juin / 21 décembre)")
+# Profils été/hiver (21 juin / 21 décembre) — utiliser les données réelles consomm_kW
 
-    import numpy as np
-    import pandas as pd
+mask_summer = (consum_kW.index.month == 6) & (consum_kW.index.day == 21)
+mask_winter = (consum_kW.index.month == 12) & (consum_kW.index.day == 21)
 
-    # Helpers robustes
-    def _first_day_any_year(series: pd.Series, month: int, day: int):
-        """Retourne le premier jour (Timestamp à 00:00) de la forme mm/jj présent dans 'series' (peu importe l'année)."""
-        idx = pd.to_datetime(series.index)
-        days = idx.normalize()
-        sel = days[(days.month == month) & (days.day == day)]
-        if len(sel) == 0:
-            return None
-        return sel.min()
+r3c1, r3c2 = st.columns(2)
+for label, mask, col in [("Été — 21 juin", mask_summer, r3c1), ("Hiver — 21 décembre", mask_winter, r3c2)]:
+    lday = consum_kW[mask].values           # ✅ consommation réelle
+    pvday = pv[mask].values                 # PV inchangé
+    tday = consum_kW[mask].index            # ✅ index réel
 
-    def _slice_exact_day(series: pd.Series, day0: pd.Timestamp):
-        """Sélectionne exactement [day0, day0+1j) sans inclure le lendemain."""
-        idx = pd.to_datetime(series.index)
-        mask = (idx >= day0) & (idx < day0 + pd.Timedelta(days=1))
-        return series.loc[mask]
+    fig, ax = plt.subplots(figsize=(8,3))
+    ax.plot(tday, lday, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+    ax.plot(tday, pvday, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
 
-    def _dt_hours(x_index) -> float:
-        """Pas de temps en heures (ex: 0.25 pour 15 min)."""
-        if len(x_index) > 1:
-            return (x_index[1] - x_index[0]).total_seconds() / 3600.0
-        return 0.25
+    auto_day = np.minimum(lday, pvday)
+    ax.fill_between(tday, 0, auto_day, hatch='//', alpha=0.18, color=COLORS["pv"], label="Autoconsommation")
 
-    # Cherche la date dans PV (plus sûr) ; si absente, essaie la conso
-    d_su = _first_day_any_year(pv, 6, 21)  or _first_day_any_year(load, 6, 21)
-    d_wi = _first_day_any_year(pv, 12, 21) or _first_day_any_year(load, 12, 21)
+    ax.set_title(f"{label}", color=COLORS["text"])
+    ax.legend()
+    col.pyplot(fig)
 
-    missing = []
-    if d_su is None: missing.append("21 juin")
-    if d_wi is None: missing.append("21 décembre")
-    if missing:
-        st.warning("⚠️ Journée introuvable dans les données : " + ", ".join(missing) + ".")
-    else:
-        # ---- Été (21 juin) ----
-        load_su = _slice_exact_day(load, d_su)
-        pv_su   = _slice_exact_day(pv, d_su)
-        ch_su   = _slice_exact_day(charged_s, d_su)
-        dis_su  = _slice_exact_day(discharged_s, d_su)
+r4c1, r4c2 = st.columns(2)
+for label, mask, col in [("Été — 21 juin", mask_summer, r4c1), ("Hiver — 21 décembre", mask_winter, r4c2)]:
+    tday = consum_kW[mask].index            # ✅ important
+    ch_day = charged_s[mask].values
+    dis_day = discharged_s[mask].values
 
-        # ---- Hiver (21 décembre) ----
-        load_wi = _slice_exact_day(load, d_wi)
-        pv_wi   = _slice_exact_day(pv, d_wi)
-        ch_wi   = _slice_exact_day(charged_s, d_wi)
-        dis_wi  = _slice_exact_day(discharged_s, d_wi)
+    fig2, ax2 = plt.subplots(figsize=(8,3))
+    ax2.bar(tday, ch_day, width=0.03, label="Charge (kWh)", color=COLORS["bess_charge"], alpha=0.9)
+    ax2.bar(tday, dis_day, width=0.03, label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.9)
+    ax2.set_title(f"Flux batterie — {label}", color=COLORS["text"])
+    ax2.legend()
+    col.pyplot(fig2)
 
-        # Flux réseau instantané (kW)
-        grid_su = load_su - pv_su - dis_su + ch_su
-        grid_wi = load_wi - pv_wi - dis_wi + ch_wi
-
-        # ---- Graphiques Conso / PV (hachure autoconsommation) ----
-        c1, c2 = st.columns(2)
-        for title, ld, pv_p, grid, day_found, col in [
-            ("Été — 21 juin",      load_su, pv_su, grid_su, d_su, c1),
-            ("Hiver — 21 décembre", load_wi, pv_wi, grid_wi, d_wi, c2),
-        ]:
-            fig, ax = plt.subplots(figsize=(8, 3), dpi=140)
-
-            # Courbes
-            ax.plot(ld.index,   ld.values,   label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-            ax.plot(pv_p.index, pv_p.values, label="PV (kW)",    color=COLORS["pv"],   linewidth=1.8)
-
-            # Hachure autoconsommation
-            auto = np.minimum(ld.values, pv_p.values)
-            ax.fill_between(ld.index, 0, auto, color=COLORS["pv"], alpha=0.35, hatch="//", label="Autoconsommation")
-
-            # Réseau import/export
-            ax.plot(grid.index,  grid.clip(lower=0).values,   "--", color=COLORS["grid_import"], label="Soutirage (kW)")
-            ax.plot(grid.index, (-grid).clip(lower=0).values, ":",  color=COLORS["grid_export"], label="Injection (kW)")
-
-            ax.set_title(f"{title} — {day_found.date()}", color=COLORS["text"])
-            ax.legend()
-            col.pyplot(fig)
-
-        # ---- Graphiques Batterie (kWh par pas) — barres propres, non superposées ----
-        c3, c4 = st.columns(2)
-        for title, ch, dis, day_found, col in [
-            ("Flux batterie — Été (21 juin)",  ch_su,  dis_su,  d_su, c3),
-            ("Flux batterie — Hiver (21 décembre)", ch_wi, dis_wi, d_wi, c4),
-        ]:
-            # Energie par pas (kWh) = kW * pas(h)
-            dt_h = _dt_hours(ch.index) if len(ch) else _dt_hours(dis.index)
-            en_ch  = ch.values  * dt_h
-            en_dis = -dis.values * dt_h  # négatif pour tracer vers le bas
-
-            # Largeur des barres = durée du pas en fraction de jour
-            width = dt_h / 24.0
-
-            fig2, ax2 = plt.subplots(figsize=(8, 3), dpi=140)
-            # align='edge' évite l'effet de superposition "bizarre"
-            ax2.bar(ch.index,  en_ch,  width=width, align="edge", label="Charge (kWh)",   color=COLORS["bess_charge"],   alpha=0.9)
-            ax2.bar(dis.index, en_dis, width=width, align="edge", label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.9)
-            ax2.set_title(title + f" — {day_found.date()}", color=COLORS["text"])
-            ax2.legend()
-            col.pyplot(fig2)
 
 
 
