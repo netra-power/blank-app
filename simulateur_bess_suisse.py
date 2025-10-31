@@ -440,49 +440,6 @@ def simulate_dispatch(load_arr, pv_arr, prices_arr, cap_kwh, p_kw, eff_rt, dod, 
 
 
 
-        # PV direct + charge PV si surplus
-        if net < -1e-12:
-            surplus = -net
-            charge_pv = min(surplus, p_kw, soc_max - soc)
-            soc += charge_pv * eff_rt
-            charged[i] += charge_pv
-            charged_from_pv[i] += charge_pv
-        else:
-            # décharge pour couvrir déficit
-            deficit = net
-            if deficit > 1e-12:
-                discharge = min(deficit, p_kw, soc - soc_min)
-                delivered = discharge * eff_rt
-                soc -= discharge
-                discharged[i] += delivered
-                rev_auto[i] = delivered * price
-
-        # Arbitrage
-        if market_free:
-            if price <= low and soc < soc_max:
-                grid_charge = min(p_kw, soc_max - soc)
-                soc += grid_charge * eff_rt
-                charged[i] += grid_charge
-                charged_from_grid[i] += grid_charge
-
-            if price >= high and soc > soc_min:
-                grid_discharge = min(p_kw, soc - soc_min)
-                delivered = grid_discharge * eff_rt
-                soc -= grid_discharge
-                discharged[i] += delivered
-                rev_arb[i] = max(0.0, price - low) * delivered
-
-        soc = min(max(soc, soc_min), soc_max)
-
-    net_before = (load - pv).clip(lower=0)
-    net_after = (load - pv - discharged + charged).clip(lower=0)
-
-    return (
-        charged, discharged, charged_from_pv, charged_from_grid,
-        rev_auto.sum(), rev_arb.sum(),
-        net_before, net_after
-    )
-
 charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_before, net_after = simulate_dispatch(
     load.to_numpy(), pv.to_numpy(), prices.to_numpy(), batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
 )
