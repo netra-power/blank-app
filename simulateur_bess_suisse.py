@@ -344,20 +344,23 @@ else:
 
 
 # -----------------------------
-# Prix de l'électricité
+# Prix de l'électricité (aligné sur l'index réel du profil)
 # -----------------------------
 if marche_libre == "Oui":
     st.info("⏳ Téléchargement des prix Swissgrid (ENTSO-E)...")
     entsoe_df, err = fetch_entsoe_prices(30)
     if entsoe_df is not None:
-        prices = entsoe_df.set_index("datetime")["EUR_kWh"].reindex(idx, method="ffill") * eur_chf
+        # On interpole sur l'index réel load/pv
+        prices = entsoe_df.set_index("datetime")["EUR_kWh"].reindex(load.index, method="ffill") * eur_chf
         st.success("✅ Prix ENTSO-E chargés.")
     else:
         st.warning(f"⚠️ Données indisponibles ({err}). Profil synthétique utilisé.")
-        t = np.arange(8760)
-        prices = pd.Series(0.12 + 0.03*np.sin(2*np.pi*(t%24)/24), index=idx)
+        prices = pd.Series(0.12 + 0.03*np.sin(2*np.pi*(np.arange(len(load))%24)/24), index=load.index)
+
 else:
-    prices = pd.Series(np.full(len(idx), price_buy_fixed), index=idx)
+    # ⚠️ ici aussi → index = load.index, PAS 8760
+    prices = pd.Series(np.full(len(load), price_buy_fixed), index=load.index)
+
 
 
 # -----------------------------
