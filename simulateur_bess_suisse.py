@@ -235,9 +235,11 @@ with st.sidebar:
         consum_kW = consum_kW.astype(float)
 
     
-        # ✅ Mise sur grille 15 min uniforme
+        # ✅ Mise sur grille 15 min uniforme SANS aplatissement
         idx_15m = pd.date_range(consum_kW.index.min(), consum_kW.index.max(), freq="15T")
-        consum_kW = consum_kW.reindex(idx_15m, method="nearest")
+        consum_kW = consum_kW.reindex(idx_15m)           # pas de method="nearest"
+        consum_kW = consum_kW.interpolate(method="time") # interpolation temporelle
+
         
         # ✅ Calcul consommation annuelle réelle à partir du profil importé
         annual_kwh_from_csv = (consum_kW * 0.25).sum()
