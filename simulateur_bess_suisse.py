@@ -312,32 +312,36 @@ with st.sidebar:
 # -----------------------------
 # Profils (conso & PV)
 # -----------------------------
-idx = year_hours(2024)
 
-# ✅ Toujours utiliser consum_kW (qu'il vienne du CSV ou du profil synthétique)
+# ✅ On utilise directement les horodatages réels du profil (CSV ou généré)
+idx = consum_kW.index
 load = consum_kW.copy()
 
-# ✅ Conversion du profil importé en pas horaire (conservation forme réelle)
+# ✅ Conversion seulement si CSV est en pas 15 min → on passe en horaire proprement
 if load.index.freq != 'H':
-    # Si profil 15 min → on convertit correctement en heure
     load = load.resample('H').mean()
 
-# ✅ Ré-aligner proprement sur l’année complète
-load = load.reindex(idx, method="nearest")
+# ✅ On ne recrée PAS une année artificielle → on garde la vraie chronologie
 
-
-
+# -----------------------------
+# PV aligné sur les mêmes timestamps
+# -----------------------------
 if has_pv:
     if pv_upload:
         pv_df = pd.read_csv(pv_upload, header=None, sep=None, engine="python")
-        pv = ensure_len(pv_df.iloc[:, 0].values, 8760)
-        pv = pd.Series(pv, index=idx)
+        pv_series = pv_df.iloc[:, 0].astype(float)
+        pv = pd.Series(pv_series.values, index=idx)
     else:
         pv = build_pv_profile(pv_kwc)
-        if pv_total_kwh > 0:
-            pv *= pv_total_kwh / pv.sum()
+        pv = pv.reindex(idx, method="nearest").fillna(0)
+
+    # Ajustement énergie PV si demandé
+    if pv_total_kwh > 0:
+        pv *= pv_total_kwh / pv.sum()
+
 else:
-    pv = pd.Series(np.zeros(8760), index=idx)
+    pv = pd.Series(np.zeros(len(idx)), index=idx)
+
 
 # -----------------------------
 # Prix de l'électricité
