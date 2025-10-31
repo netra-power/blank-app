@@ -435,9 +435,14 @@ charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_
     load, pv, prices, batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
 )
 
-# Convert to Series for masking operations
-charged_s = pd.Series(charged, index=idx)
-discharged_s = pd.Series(discharged, index=idx)
+# ✅ Conversion correcte avec l’index réel du profil (CSV ou synthétique)
+charged_s = pd.Series(charged, index=load.index)
+discharged_s = pd.Series(discharged, index=load.index)
+charged_from_pv = pd.Series(charged_from_pv, index=load.index)
+charged_from_grid = pd.Series(charged_from_grid, index=load.index)
+net_before = pd.Series(net_before, index=load.index)
+net_after = pd.Series(net_after, index=load.index)
+
 
 # -----------------------------
 # PV split & sources d'énergie
