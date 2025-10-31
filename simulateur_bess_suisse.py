@@ -367,7 +367,13 @@ else:
 # Simulation + dispatch (distinction charge PV / charge réseau)
 # -----------------------------
 def simulate_dispatch(load, pv, prices, cap_kwh, p_kw, eff_rt, dod, market_free):
+    # ✅ Convertit proprement en numpy (évite problèmes d'index)
+    load = np.asarray(load, dtype=float)
+    pv = np.asarray(pv, dtype=float)
+    prices = np.asarray(prices, dtype=float)
+
     n = len(load)
+
     soc = 0.5 * cap_kwh
     soc_min, soc_max = (1-dod)*cap_kwh, cap_kwh
 
