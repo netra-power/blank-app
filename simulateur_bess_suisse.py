@@ -366,7 +366,7 @@ def simulate_dispatch(load_arr, pv_arr, prices_arr, cap_kwh, p_kw, eff_rt, dod, 
 
     n = len(load_arr)
     soc = 0.5 * cap_kwh
-    soc_min, soc_max = (1-dod)*cap_kwh, cap_kwh
+    soc_min, soc_max = (1 - dod) * cap_kwh, cap_kwh
 
     charged = np.zeros(n)
     discharged = np.zeros(n)
@@ -376,6 +376,7 @@ def simulate_dispatch(load_arr, pv_arr, prices_arr, cap_kwh, p_kw, eff_rt, dod, 
     rev_auto = np.zeros(n)
     rev_arb = np.zeros(n)
 
+    # Seuils pour arbitrage si marché libre
     if market_free:
         low, high = np.quantile(prices_arr, [0.25, 0.75])
     else:
@@ -386,47 +387,57 @@ def simulate_dispatch(load_arr, pv_arr, prices_arr, cap_kwh, p_kw, eff_rt, dod, 
         load_h = load_arr[i]
         price = prices_arr[i]
 
-        net = load_h - pv_h
+        net = load_h - pv_h  # >0 = besoin réseau, <0 = surplus PV
 
-        if net < 0:  # surplus PV
+        # --- PV → Charge Batterie ---
+        if net < 0:
             surplus = -net
             charge_pv = min(surplus, p_kw, soc_max - soc)
             soc += charge_pv * eff_rt
             charged[i] += charge_pv
             charged_from_pv[i] += charge_pv
-        else:
-            deficit = net
-            if deficit > 0:
-                discharge = min(deficit, p_kw, soc - soc_min)
-                delivered = discharge * eff_rt
-                soc -= discharge
-                discharged[i] += delivered
-                rev_auto[i] = delivered * price
+            continue
 
+        # --- Décharge pour autoconsommation ---
+        deficit = net
+        if deficit > 0:
+            discharge = min(deficit, p_kw, soc - soc_min)
+            delivered = discharge * eff_rt
+            soc -= discharge
+            discharged[i] += delivered
+            rev_auto[i] = delivered * price
+
+        # --- Arbitrage (marché libre) ---
         if market_free:
+            # Charge réseau si prix bas
             if price <= low and soc < soc_max:
                 grid_charge = min(p_kw, soc_max - soc)
                 soc += grid_charge * eff_rt
                 charged[i] += grid_charge
                 charged_from_grid[i] += grid_charge
 
+            # Décharge réseau si prix haut
             if price >= high and soc > soc_min:
                 grid_discharge = min(p_kw, soc - soc_min)
                 delivered = grid_discharge * eff_rt
                 soc -= grid_discharge
                 discharged[i] += delivered
-                rev_arb[i] = max(0.0, price - low) * delivered
+                rev_arb[i] = max(price - low, 0) * delivered
 
+        # Sécurité SOC
         soc = min(max(soc, soc_min), soc_max)
 
+    # Flux réseau AVANT / APRÈS BESS
     net_before_arr = np.clip(load_arr - pv_arr, 0, None)
     net_after_arr = np.clip(load_arr - pv_arr - discharged + charged, 0, None)
 
     return (
-        charged, discharged, charged_from_pv, charged_from_grid,
+        charged, discharged,
+        charged_from_pv, charged_from_grid,
         rev_auto.sum(), rev_arb.sum(),
         net_before_arr, net_after_arr
     )
+
 
 
         # PV direct + charge PV si surplus
