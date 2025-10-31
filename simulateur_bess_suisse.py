@@ -447,16 +447,11 @@ idx = load.index  # index réel (CSV ou profil synthétique)
 # PV est déjà aligné sur load.index plus haut → on ne touche à rien
 # Prices est déjà aligné sur load.index plus haut → on ne touche à rien
 
-# Convertir pour la simulation (numpy)
-load_arr   = load.values.astype(float)
-pv_arr     = pv.values.astype(float)
-prices_arr = prices.values.astype(float)
-
-
 # --- Simulation ---
 charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_before, net_after = simulate_dispatch(
-    load_arr, pv_arr, prices_arr, batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
+    load, pv, prices, batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
 )
+
 
 # --- Retour en Series pour les graphes ---
 charged_s         = pd.Series(charged, index=idx)
