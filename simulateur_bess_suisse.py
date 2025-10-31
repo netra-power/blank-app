@@ -680,20 +680,20 @@ with row2_col2:
 # -------------------------------------------------------------
 st.markdown("### 📈 Profils — Journées type (21 juin / 21 décembre)")
 
-# ✅ Masques cohérents (basés sur idx unique)
-mask_summer = (idx.month == 6) & (idx.day == 21)
-mask_winter = (idx.month == 12) & (idx.day == 21)
+# ✅ Masques basés sur l’index réel des séries
+mask_summer = (load.index.month == 6) & (load.index.day == 21)
+mask_winter = (load.index.month == 12) & (load.index.day == 21)
 
-# ✅ Extraction alignée
-conso_su = load[mask_summer]
-pv_su = pv[mask_summer]
-ch_su = charged_s[mask_summer]
-dis_su = discharged_s[mask_summer]
+# ✅ Extraction alignée (index commun)
+conso_su = load.loc[mask_summer]
+pv_su = pv.loc[mask_summer]
+ch_su = charged_s.loc[mask_summer]
+dis_su = discharged_s.loc[mask_summer]
 
-conso_wi = load[mask_winter]
-pv_wi = pv[mask_winter]
-ch_wi = charged_s[mask_winter]
-dis_wi = discharged_s[mask_winter]
+conso_wi = load.loc[mask_winter]
+pv_wi = pv.loc[mask_winter]
+ch_wi = charged_s.loc[mask_winter]
+dis_wi = discharged_s.loc[mask_winter]
 
 # --- Graphiques Conso + PV + Réseau ---
 r3c1, r3c2 = st.columns(2)
