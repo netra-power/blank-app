@@ -428,8 +428,9 @@ def simulate_dispatch(load, pv, prices, cap_kwh, p_kw, eff_rt, dod, market_free)
 
         soc = min(max(soc, soc_min), soc_max)
 
-    net_before = (load - pv).clip(lower=0)
-    net_after = (load - pv - discharged + charged).clip(lower=0)
+    net_before = np.clip(load - pv, 0, None)
+    net_after = np.clip(load - pv - discharged + charged, 0, None)
+
 
     return (
         charged, discharged, charged_from_pv, charged_from_grid,
