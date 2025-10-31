@@ -444,13 +444,13 @@ charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_
     load.to_numpy(), pv.to_numpy(), prices.to_numpy(), batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
 )
 
-
 charged_s = pd.Series(charged, index=load.index)
 discharged_s = pd.Series(discharged, index=load.index)
 charged_from_pv = pd.Series(charged_from_pv, index=load.index)
 charged_from_grid = pd.Series(charged_from_grid, index=load.index)
 net_before = pd.Series(net_before, index=load.index)
 net_after  = pd.Series(net_after, index=load.index)
+
 
 
 # Convert to Series for masking operations
