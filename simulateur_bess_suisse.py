@@ -317,8 +317,14 @@ idx = year_hours(2024)
 # ✅ Toujours utiliser consum_kW (qu'il vienne du CSV ou du profil synthétique)
 load = consum_kW.copy()
 
-# ✅ Harmonisation du pas de temps sur l’année complète
+# ✅ Conversion du profil importé en pas horaire (conservation forme réelle)
+if load.index.freq != 'H':
+    # Si profil 15 min → on convertit correctement en heure
+    load = load.resample('H').mean()
+
+# ✅ Ré-aligner proprement sur l’année complète
 load = load.reindex(idx, method="nearest")
+
 
 
 if has_pv:
