@@ -311,6 +311,14 @@ with st.sidebar:
 
 # ✅ Toujours utiliser consum_kW (qu'il vienne du CSV ou du profil synthétique)
 load = consum_kW.copy()
+
+# ✅ Conversion du profil importé en pas horaire
+if load.index.freq != 'H':
+    load = load.resample('H').mean()
+
+# ✅ Maintenant seulement, on définit l'index de référence
+idx = load.index
+
 # Harmonise en horaire si nécessaire (conserve les dates réelles)
 try:
     if getattr(load.index, "freq", None) != "H":
