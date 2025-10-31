@@ -439,37 +439,19 @@ def simulate_dispatch(load, pv, prices, cap_kwh, p_kw, eff_rt, dod, market_free)
     )
 
 # ---------------------------------------------------------
-# ✅ ALIGNEMENT FINAL AVANT DISPATCH
+# ✅ AUCUN RÉALIGNEMENT — ON GARDE LES DATES RÉELLES
 # ---------------------------------------------------------
 
-idx = year_hours(2024)   # Index standard 8760 heures
+idx = load.index  # index réel (CSV ou profil synthétique)
 
-# --- Load ---
-load = consum_kW.copy()
-if load.index.freq != "H":   # Si CSV en 15 min → conversion en heure
-    load = load.resample("H").mean()
-load = load.reindex(idx, method="nearest")
+# PV est déjà aligné sur load.index plus haut → on ne touche à rien
+# Prices est déjà aligné sur load.index plus haut → on ne touche à rien
 
-# --- PV ---
-if has_pv:
-    if pv_upload:
-        pv_df = pd.read_csv(pv_upload, header=None, sep=None, engine="python")
-        pv = ensure_len(pv_df.iloc[:, 0].values, len(idx))
-        pv = pd.Series(pv, index=idx)
-    else:
-        pv = build_pv_profile(pv_kwc)
-        if pv_total_kwh > 0:
-            pv *= pv_total_kwh / pv.sum()
-else:
-    pv = pd.Series(np.zeros(len(idx)), index=idx)
-
-# --- Prix ---
-prices = pd.Series(np.full(len(idx), price_buy_fixed), index=idx)
-
-# --- Conversion numpy ---
-load_arr = load.values.astype(float)
-pv_arr = pv.values.astype(float)
+# Convertir pour la simulation (numpy)
+load_arr   = load.values.astype(float)
+pv_arr     = pv.values.astype(float)
 prices_arr = prices.values.astype(float)
+
 
 # --- Simulation ---
 charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_before, net_after = simulate_dispatch(
@@ -477,8 +459,13 @@ charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_
 )
 
 # --- Retour en Series pour les graphes ---
-charged_s = pd.Series(charged, index=idx)
-discharged_s = pd.Series(discharged, index=idx)
+charged_s         = pd.Series(charged, index=idx)
+discharged_s      = pd.Series(discharged, index=idx)
+charged_from_pv   = pd.Series(charged_from_pv, index=idx)
+charged_from_grid = pd.Series(charged_from_grid, index=idx)
+net_before        = pd.Series(net_before, index=idx)
+net_after         = pd.Series(net_after, index=idx)
+
 
 
 
