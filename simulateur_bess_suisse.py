@@ -438,17 +438,48 @@ def simulate_dispatch(load, pv, prices, cap_kwh, p_kw, eff_rt, dod, market_free)
         net_before, net_after
     )
 
+# ---------------------------------------------------------
+# ✅ ALIGNEMENT FINAL AVANT DISPATCH
+# ---------------------------------------------------------
+
+idx = year_hours(2024)   # Index standard 8760 heures
+
+# --- Load ---
+load = consum_kW.copy()
+if load.index.freq != "H":   # Si CSV en 15 min → conversion en heure
+    load = load.resample("H").mean()
+load = load.reindex(idx, method="nearest")
+
+# --- PV ---
+if has_pv:
+    if pv_upload:
+        pv_df = pd.read_csv(pv_upload, header=None, sep=None, engine="python")
+        pv = ensure_len(pv_df.iloc[:, 0].values, len(idx))
+        pv = pd.Series(pv, index=idx)
+    else:
+        pv = build_pv_profile(pv_kwc)
+        if pv_total_kwh > 0:
+            pv *= pv_total_kwh / pv.sum()
+else:
+    pv = pd.Series(np.zeros(len(idx)), index=idx)
+
+# --- Prix ---
+prices = pd.Series(np.full(len(idx), price_buy_fixed), index=idx)
+
+# --- Conversion numpy ---
+load_arr = load.values.astype(float)
+pv_arr = pv.values.astype(float)
+prices_arr = prices.values.astype(float)
+
+# --- Simulation ---
 charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_before, net_after = simulate_dispatch(
-    load, pv, prices, batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
+    load_arr, pv_arr, prices_arr, batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
 )
 
-# ✅ Conversion correcte avec l’index réel du profil (CSV ou synthétique)
-charged_s = pd.Series(charged, index=load.index)
-discharged_s = pd.Series(discharged, index=load.index)
-charged_from_pv = pd.Series(charged_from_pv, index=load.index)
-charged_from_grid = pd.Series(charged_from_grid, index=load.index)
-net_before = pd.Series(net_before, index=load.index)
-net_after = pd.Series(net_after, index=load.index)
+# --- Retour en Series pour les graphes ---
+charged_s = pd.Series(charged, index=idx)
+discharged_s = pd.Series(discharged, index=idx)
+
 
 
 # -----------------------------
