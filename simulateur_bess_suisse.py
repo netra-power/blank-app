@@ -323,22 +323,25 @@ except Exception:
 load = load.reindex(idx, method="nearest")
 
 
+# -----------------------------
+# PV (toujours aligné sur le profil de conso réel)
+# -----------------------------
 if has_pv:
     if pv_upload:
         pv_df = pd.read_csv(pv_upload, header=None, sep=None, engine="python")
-        pv = ensure_len(pv_df.iloc[:, 0].values, 8760)
-        pv = pd.Series(pv, index=load.index)
+        pv = ensure_len(pv_df.iloc[:, 0].values, len(load))  # adapte la longueur
+        pv = pd.Series(pv, index=load.index)                 # aligne sur conso
     else:
         pv = build_pv_profile(pv_kwc)
-# Aligne PV sur l’index réel de charge (sans aplatir)
-try:
-    pv = pv.reindex(load.index, method="nearest")
-except Exception:
-    pass
-        if pv_total_kwh > 0:
-            pv *= pv_total_kwh / pv.sum()
+        pv = pv.reindex(load.index, method="nearest")        # aligne sur conso
+
+    # ✅ Mise à l’échelle si l’utilisateur indique une production annuelle
+    if pv_total_kwh > 0 and pv.sum() > 0:
+        pv *= pv_total_kwh / (pv.sum() * 1.0)
+
 else:
     pv = pd.Series(np.zeros(len(load)), index=load.index)
+
 
 # -----------------------------
 # Prix de l'électricité
@@ -359,7 +362,8 @@ else:
 # -----------------------------
 # Simulation + dispatch (distinction charge PV / charge réseau)
 # -----------------------------
-def simulate_dispatch(load.to_numpy(), pv.to_numpy(), prices.to_numpy(), cap_kwh, p_kw, eff_rt, dod, market_free):
+def simulate_dispatch(load_arr, pv_arr, prices_arr, cap_kwh, p_kw, eff_rt, dod, market_free):
+
     n = len(load)
     soc = 0.5 * cap_kwh
     soc_min, soc_max = (1-dod)*cap_kwh, cap_kwh
@@ -424,8 +428,17 @@ def simulate_dispatch(load.to_numpy(), pv.to_numpy(), prices.to_numpy(), cap_kwh
         net_before, net_after
     )
 
-charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_before, net_after = simulate_dispatch(load.to_numpy(), pv.to_numpy(), prices.to_numpy(), batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
+charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_before, net_after = simulate_dispatch(
+    load.to_numpy(), pv.to_numpy(), prices.to_numpy(), batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
 )
+
+charged_s = pd.Series(charged, index=load.index)
+discharged_s = pd.Series(discharged, index=load.index)
+charged_from_pv = pd.Series(charged_from_pv, index=load.index)
+charged_from_grid = pd.Series(charged_from_grid, index=load.index)
+net_before = pd.Series(net_before, index=load.index)
+net_after  = pd.Series(net_after, index=load.index)
+
 
 # Convert to Series for masking operations
 charged_s = pd.Series(charged, index=load.index)
