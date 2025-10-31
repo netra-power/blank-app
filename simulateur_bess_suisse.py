@@ -471,7 +471,7 @@ pv_self_no_bess = np.minimum(pv, load)                  # sans batterie
 grid_to_load_no_bess = (load - pv_self_no_bess).clip(lower=0)
 
 pv_self = np.minimum(pv, load)                          # avec batterie (direct PV→charge)
-pv_to_batt = charged_from_pv.clip(min=0)
+pv_to_batt = charged_from_pv.clip(lower=0)
 pv_export = np.maximum(0.0, pv - pv_self - pv_to_batt)
 
 bess_to_load = discharged_s                             # batterie → charge du bâtiment
