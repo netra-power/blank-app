@@ -312,68 +312,48 @@ with st.sidebar:
 # -----------------------------
 # Profils (conso & PV)
 # -----------------------------
+idx = year_hours(2024)
 
-# ✅ On utilise directement les horodatages réels du profil (CSV ou généré)
-idx = consum_kW.index
+# ✅ Toujours utiliser consum_kW (qu'il vienne du CSV ou du profil synthétique)
 load = consum_kW.copy()
 
-# ✅ Conversion seulement si CSV est en pas 15 min → on passe en horaire proprement
-if load.index.freq != 'H':
-    load = load.resample('H').mean()
+# ✅ Harmonisation du pas de temps sur l’année complète
+load = load.reindex(idx, method="nearest")
 
-# ✅ On ne recrée PAS une année artificielle → on garde la vraie chronologie
 
-# -----------------------------
-# PV aligné sur les mêmes timestamps
-# -----------------------------
 if has_pv:
     if pv_upload:
         pv_df = pd.read_csv(pv_upload, header=None, sep=None, engine="python")
-        pv_series = pv_df.iloc[:, 0].astype(float)
-        pv = pd.Series(pv_series.values, index=idx)
+        pv = ensure_len(pv_df.iloc[:, 0].values, 8760)
+        pv = pd.Series(pv, index=idx)
     else:
         pv = build_pv_profile(pv_kwc)
-        pv = pv.reindex(idx, method="nearest").fillna(0)
-
-    # Ajustement énergie PV si demandé
-    if pv_total_kwh > 0:
-        pv *= pv_total_kwh / pv.sum()
-
+        if pv_total_kwh > 0:
+            pv *= pv_total_kwh / pv.sum()
 else:
-    pv = pd.Series(np.zeros(len(idx)), index=idx)
-
+    pv = pd.Series(np.zeros(8760), index=idx)
 
 # -----------------------------
-# Prix de l'électricité (aligné sur l'index réel du profil)
+# Prix de l'électricité
 # -----------------------------
 if marche_libre == "Oui":
     st.info("⏳ Téléchargement des prix Swissgrid (ENTSO-E)...")
     entsoe_df, err = fetch_entsoe_prices(30)
     if entsoe_df is not None:
-        # On interpole sur l'index réel load/pv
-        prices = entsoe_df.set_index("datetime")["EUR_kWh"].reindex(load.index, method="ffill") * eur_chf
+        prices = entsoe_df.set_index("datetime")["EUR_kWh"].reindex(idx, method="ffill") * eur_chf
         st.success("✅ Prix ENTSO-E chargés.")
     else:
         st.warning(f"⚠️ Données indisponibles ({err}). Profil synthétique utilisé.")
-        prices = pd.Series(0.12 + 0.03*np.sin(2*np.pi*(np.arange(len(load))%24)/24), index=load.index)
-
+        t = np.arange(8760)
+        prices = pd.Series(0.12 + 0.03*np.sin(2*np.pi*(t%24)/24), index=idx)
 else:
-    # ⚠️ ici aussi → index = load.index, PAS 8760
-    prices = pd.Series(np.full(len(load), price_buy_fixed), index=load.index)
-
-
+    prices = pd.Series(np.full(8760, price_buy_fixed), index=idx)
 
 # -----------------------------
 # Simulation + dispatch (distinction charge PV / charge réseau)
 # -----------------------------
 def simulate_dispatch(load, pv, prices, cap_kwh, p_kw, eff_rt, dod, market_free):
-    # ✅ Convertit proprement en numpy (évite problèmes d'index)
-    load = np.asarray(load, dtype=float)
-    pv = np.asarray(pv, dtype=float)
-    prices = np.asarray(prices, dtype=float)
-
     n = len(load)
-
     soc = 0.5 * cap_kwh
     soc_min, soc_max = (1-dod)*cap_kwh, cap_kwh
 
@@ -428,9 +408,8 @@ def simulate_dispatch(load, pv, prices, cap_kwh, p_kw, eff_rt, dod, market_free)
 
         soc = min(max(soc, soc_min), soc_max)
 
-    net_before = np.clip(load - pv, 0, None)
-    net_after = np.clip(load - pv - discharged + charged, 0, None)
-
+    net_before = (load - pv).clip(lower=0)
+    net_after = (load - pv - discharged + charged).clip(lower=0)
 
     return (
         charged, discharged, charged_from_pv, charged_from_grid,
@@ -438,31 +417,13 @@ def simulate_dispatch(load, pv, prices, cap_kwh, p_kw, eff_rt, dod, market_free)
         net_before, net_after
     )
 
-# ---------------------------------------------------------
-# ✅ AUCUN RÉALIGNEMENT — ON GARDE LES DATES RÉELLES
-# ---------------------------------------------------------
-
-idx = load.index  # index réel (CSV ou profil synthétique)
-
-# PV est déjà aligné sur load.index plus haut → on ne touche à rien
-# Prices est déjà aligné sur load.index plus haut → on ne touche à rien
-
-# --- Simulation ---
 charged, discharged, charged_from_pv, charged_from_grid, rev_auto, rev_arb, net_before, net_after = simulate_dispatch(
     load, pv, prices, batt_kwh, batt_kw, eff_rt, dod, marche_libre=="Oui"
 )
 
-
-# --- Retour en Series pour les graphes ---
-charged_s         = pd.Series(charged, index=idx)
-discharged_s      = pd.Series(discharged, index=idx)
-charged_from_pv   = pd.Series(charged_from_pv, index=idx)
-charged_from_grid = pd.Series(charged_from_grid, index=idx)
-net_before        = pd.Series(net_before, index=idx)
-net_after         = pd.Series(net_after, index=idx)
-
-
-
+# Convert to Series for masking operations
+charged_s = pd.Series(charged, index=idx)
+discharged_s = pd.Series(discharged, index=idx)
 
 # -----------------------------
 # PV split & sources d'énergie
@@ -471,7 +432,7 @@ pv_self_no_bess = np.minimum(pv, load)                  # sans batterie
 grid_to_load_no_bess = (load - pv_self_no_bess).clip(lower=0)
 
 pv_self = np.minimum(pv, load)                          # avec batterie (direct PV→charge)
-pv_to_batt = charged_from_pv.clip(lower=0)
+pv_to_batt = charged_from_pv.clip(min=0)
 pv_export = np.maximum(0.0, pv - pv_self - pv_to_batt)
 
 bess_to_load = discharged_s                             # batterie → charge du bâtiment
@@ -717,100 +678,78 @@ with row2_col2:
 
 
 # -------------------------------------------------------------
-# 📈 Profils — Journées type (21 juin / 21 décembre) **ROBUSTE**
+# 📈 Profils — Journées type (21 juin / 21 décembre)
 # -------------------------------------------------------------
 st.markdown("### 📈 Profils — Journées type (21 juin / 21 décembre)")
 
-def _first_day_slice(series: pd.Series, month: int, day: int):
-    """Retourne la sous-série du premier 21/xx trouvé (quels que soient l'année et le pas de temps)."""
-    if series.empty:
-        return series
-    idx = series.index
-    mask = (idx.month == month) & (idx.day == day)
-    if not mask.any():
-        return series.iloc[0:0]  # vide si jamais absent
-    day0 = idx[mask][0].normalize()
-    day1 = day0 + pd.Timedelta(days=1)
-    return series[(idx >= day0) & (idx < day1)]
+# ✅ Masques basés sur l’index réel des séries
+mask_summer = (load.index.month == 6) & (load.index.day == 21)
+mask_winter = (load.index.month == 12) & (load.index.day == 21)
 
-# 👉 On travaille sur la série de charge **réelle** (celle que tu affiches partout = `load`)
-#    Si un CSV a été importé, `load` doit déjà être construit à partir de ce CSV.
-#    On ne repasse PAS par idx/nearest ici, on garde le pas réel.
-conso_21j = _first_day_slice(load, 6, 21)
-conso_21d = _first_day_slice(load, 12, 21)
+# ✅ Extraction alignée (index commun)
+conso_su = load.loc[mask_summer]
+pv_su = pv.loc[mask_summer]
+ch_su = charged_s.loc[mask_summer]
+dis_su = discharged_s.loc[mask_summer]
 
-# Si vide (CSV sans ces dates), on informe proprement
-if conso_21j.empty or conso_21d.empty:
-    st.warning("⚠️ Impossible de trouver le 21 juin ou le 21 décembre dans les données (CSV) fournies.")
-else:
-    # On définit un index-jour **de référence** basé sur le pas d'échantillonnage de la conso
-    def _day_index_like(series: pd.Series):
-        dt = series.index.to_series().diff().dropna().median()
-        start = series.index[0].normalize()
-        end = start + pd.Timedelta(days=1)
-        return pd.date_range(start, end, freq=dt, inclusive="left")
+conso_wi = load.loc[mask_winter]
+pv_wi = pv.loc[mask_winter]
+ch_wi = charged_s.loc[mask_winter]
+dis_wi = discharged_s.loc[mask_winter]
 
-    day_idx_j = _day_index_like(conso_21j)
-    day_idx_d = _day_index_like(conso_21d)
+# --- Graphiques Conso + PV + Réseau ---
+r3c1, r3c2 = st.columns(2)
 
-    # Aligner PV et BESS sur le même index jour (sans aplatir : nearest sur une journée est OK)
-    pv_21j  = _first_day_slice(pv, 6, 21).reindex(day_idx_j, method="nearest")
-    pv_21d  = _first_day_slice(pv, 12, 21).reindex(day_idx_d, method="nearest")
+for (label, conso_day, pv_day, ch_day, dis_day, col) in [
+    ("Été — 21 juin", conso_su, pv_su, ch_su, dis_su, r3c1),
+    ("Hiver — 21 décembre", conso_wi, pv_wi, ch_wi, dis_wi, r3c2)
+]:
+    # ✅ Alignement index PV / Conso
+    pv_day = pv_day.reindex(conso_day.index, method="nearest")
 
-    ch_21j  = _first_day_slice(charged_s, 6, 21).reindex(day_idx_j, method="nearest")
-    dis_21j = _first_day_slice(discharged_s, 6, 21).reindex(day_idx_j, method="nearest")
-    ch_21d  = _first_day_slice(charged_s, 12, 21).reindex(day_idx_d, method="nearest")
-    dis_21d = _first_day_slice(discharged_s, 12, 21).reindex(day_idx_d, method="nearest")
+    # ✅ Calcul réseau (import / export)
+    grid_import = np.maximum(conso_day - pv_day - dis_day + ch_day, 0)
+    grid_export = np.maximum(pv_day - conso_day - ch_day + dis_day, 0)
 
-    # Calcul réseau (import / export) sur le même pas de temps que la conso du jour
-    grid_imp_21j = np.maximum(conso_21j.reindex(day_idx_j) - pv_21j - dis_21j + ch_21j, 0)
-    grid_exp_21j = np.maximum(pv_21j - conso_21j.reindex(day_idx_j) - ch_21j + dis_21j, 0)
+    fig, ax = plt.subplots(figsize=(8, 3), dpi=150)
 
-    grid_imp_21d = np.maximum(conso_21d.reindex(day_idx_d) - pv_21d - dis_21d + ch_21d, 0)
-    grid_exp_21d = np.maximum(pv_21d - conso_21d.reindex(day_idx_d) - ch_21d + dis_21d, 0)
+    # Conso & PV
+    ax.plot(conso_day.index, conso_day.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+    ax.plot(conso_day.index, pv_day.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
 
-    # --------- LIGNE 1 : Conso + PV + Autoconso + Réseau ----------
-    r3c1, r3c2 = st.columns(2)
+    # Autoconsommation (hachurée)
+    auto = np.minimum(conso_day.values, pv_day.values)
+    ax.fill_between(conso_day.index, 0, auto, color=COLORS["pv"], alpha=0.22, hatch="//", label="Autoconsommation")
 
-    for (label, t, conso_day, pv_day, gi, ge, col) in [
-        ("Été — 21 juin", day_idx_j, conso_21j.reindex(day_idx_j), pv_21j,  grid_imp_21j, grid_exp_21j, r3c1),
-        ("Hiver — 21 décembre", day_idx_d, conso_21d.reindex(day_idx_d), pv_21d, grid_imp_21d, grid_exp_21d, r3c2),
-    ]:
-        fig, ax = plt.subplots(figsize=(8, 3), dpi=150)
+    # Réseau
+    ax.plot(conso_day.index, grid_import.values, linestyle="--", linewidth=1.4, color=COLORS["grid_import"], label="Soutirage réseau (kW)")
+    ax.plot(conso_day.index, grid_export.values, linestyle=":", linewidth=1.4, color=COLORS["grid_export"], label="Injection réseau (kW)")
 
-        # Conso & PV
-        ax.plot(t, conso_day.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-        ax.plot(t, pv_day.values,    label="PV (kW)",    color=COLORS["pv"],   linewidth=1.6)
+    ax.set_title(label, color=COLORS["text"])
+    ax.legend()
 
-        # Autoconsommation (hachurée)
-        auto = np.minimum(conso_day.values, pv_day.values)
-        ax.fill_between(t, 0, auto, color=COLORS["pv"], alpha=0.22, hatch="//", label="Autoconsommation")
+    ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    
+    col.pyplot(fig)
 
-        # Réseau (import / export)
-        ax.plot(t, gi.values, linestyle="--", linewidth=1.4, color=COLORS["grid_import"], label="Soutirage réseau (kW)")
-        ax.plot(t, ge.values, linestyle=":",  linewidth=1.4, color=COLORS["grid_export"], label="Injection réseau (kW)")
 
-        ax.set_title(label, color=COLORS["text"])
-        ax.xaxis.set_major_locator(mdates.HourLocator(interval=4))
-        ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-        ax.legend()
-        col.pyplot(fig)
 
-    # --------- LIGNE 2 : Flux batterie ----------
-    r4c1, r4c2 = st.columns(2)
+# --- Graphiques Charge / Décharge BESS (identiques à l'origine)
+r4c1, r4c2 = st.columns(2)
 
-    for (label, t, ch, dis, col) in [
-        ("Flux batterie — Été — 21 juin",      day_idx_j, ch_21j, dis_21j, r4c1),
-        ("Flux batterie — Hiver — 21 décembre", day_idx_d, ch_21d, dis_21d, r4c2),
-    ]:
-        fig2, ax2 = plt.subplots(figsize=(8, 3), dpi=150)
-        ax2.bar(t, ch.values,  width=0.04, label="Charge (kWh)",    color=COLORS["bess_charge"],    alpha=0.9)
-        ax2.bar(t, -dis.values, width=0.04, label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.9)
-        ax2.set_title(label, color=COLORS["text"])
-        ax2.xaxis.set_major_locator(mdates.HourLocator(interval=4))
-        ax2.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-        ax2.legend()
-        col.pyplot(fig2)
+for (label, t, ch, dis, col) in [
+    ("Été — 21 juin", ch_su.index, ch_su, dis_su, r4c1),
+    ("Hiver — 21 décembre", ch_wi.index, ch_wi, dis_wi, r4c2)
+]:
+    fig2, ax2 = plt.subplots(figsize=(8, 3))
+    ax2.bar(t, ch, width=0.04, label="Charge (kWh)", color=COLORS["bess_charge"], alpha=0.9)
+    ax2.bar(t, -dis, width=0.04, label="Décharge (kWh)", color=COLORS["bess_discharge"], alpha=0.9)
+    ax2.set_title(f"Flux batterie — {label}", color=COLORS["text"])
+    ax2.legend()
+    ax2.xaxis.set_major_locator(mdates.HourLocator(interval=4))
+    ax2.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+    col.pyplot(fig2)
 
 
 # ---------- Peak shaving annuel (si marché libre) ----------
