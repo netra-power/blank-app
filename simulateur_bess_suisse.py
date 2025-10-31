@@ -308,7 +308,6 @@ with st.sidebar:
 # -----------------------------
 # Profils (conso & PV)
 # -----------------------------
-idx = load.index
 
 # ✅ Toujours utiliser consum_kW (qu'il vienne du CSV ou du profil synthétique)
 load = consum_kW.copy()
