@@ -155,6 +155,11 @@ def fetch_entsoe_prices(days=30, in_domain="10YCH-SWISSGRIDZ"):
 st.title("🔋 Simulateur revenus BESS Suisse")
 st.caption("Devise: CHF — Profils horaires sur 1 an (8760 h)")
 
+# ==== Place ceci juste AVANT: with st.sidebar: ====
+pv_from_file = False
+pv_15m_kW = None
+
+
 with st.sidebar:
     st.header("Configuration")
     system_type = st.selectbox("Type de configuration", [
@@ -296,6 +301,60 @@ with st.sidebar:
             "> - Ligne 2 : unité dans la 2ème colonne → `(kW)` ou `(kWh)`\n"
             "> - Puis les données → `dd.mm.yyyy HH:MM ; valeur`\n"
         )
+
+        if pv_upload is None:
+            st.info("ℹ️ Aucun fichier importé — saisissez la production annuelle ci-dessous.")
+        else:
+            # --- Parsing du CSV PV (même format que conso) ---
+            df_pv = pd.read_csv(pv_upload, sep=";", header=None, dtype=str)
+            df_pv.columns = ["DateHeure", "PV"]
+        
+            unit_pv = df_pv.iloc[1, 1].strip()
+            df_pv = df_pv.iloc[2:].copy()
+        
+            df_pv["DateHeure"] = pd.to_datetime(df_pv["DateHeure"], format="%d.%m.%Y %H:%M", errors="coerce")
+            df_pv["PV"] = df_pv["PV"].str.replace(",", ".", regex=False).astype(float)
+        
+            unit_clean = unit_pv.lower().replace(" ", "")
+            if unit_clean in ["(kw)", "kw"]:
+                st.success("✅ Profil PV importé en puissance (kW)")
+                pv_serie = df_pv.set_index("DateHeure")["PV"].rename("PV_kW")
+            elif unit_clean in ["(kwh)", "kwh"]:
+                st.success("✅ Profil PV importé en énergie (kWh) → conversion en kW")
+                df_pv = df_pv.sort_values("DateHeure")
+                pv_serie = (df_pv["PV"].astype(float) * 4)   # kWh/15min → kW
+                pv_serie.index = df_pv["DateHeure"]
+                pv_serie = pv_serie.rename("PV_kW")
+            else:
+                st.error("⚠️ L'unité doit être `(kW)` ou `(kWh)`.")
+                st.stop()
+        
+            # Tri, dédoublonnage, NaT
+            pv_serie = pv_serie.sort_index()
+            pv_serie = pv_serie[~pv_serie.index.duplicated(keep="first")]
+            pv_serie = pv_serie[pv_serie.index.notna()]
+        
+            # Uniformisation 15 min
+            idx_15 = pd.date_range(pv_serie.index.min(), pv_serie.index.max(), freq="15T")
+            pv_15m_kW = pv_serie.reindex(idx_15).interpolate(method="time")
+        
+            # Flag pour l’étape suivante
+            pv_from_file = True
+        
+            # Bulle “Production annuelle (profil importé)”
+            annual_pv_kwh_from_csv = (pv_15m_kW * 0.25).sum()
+            annual_pv_display = f"{annual_pv_kwh_from_csv:,.0f}".replace(",", " ")
+            st.markdown(
+                f"""
+                <div style="margin-top:0.5rem; margin-bottom:0.5rem;">
+                    <span style="font-size:0.9rem; color:#6c757d;">Production annuelle (profil importé)</span><br>
+                    <span style="font-size:1.1rem; font-weight:600;">{annual_pv_display} kWh</span>
+                </div>
+                """,
+                unsafe_allow_html=True
+            )
+
+    
         if pv_upload is None:
             st.info("ℹ️ Aucun fichier importé — saisissez la production annuelle ci-dessous.")
 
@@ -361,27 +420,18 @@ load = consum_kW.copy()
 # ✅ Harmonisation du pas de temps sur l’année complète
 load = load.reindex(idx, method="nearest")
 
-# -----------------------------
-# Profil PV final (à partir du choix dans la sidebar)
-# -----------------------------
+
+# ---- Profil PV final (en kW sur idx annuel) ----
 if has_pv:
-
-    if pv_upload is not None:
-        # pv_kW est déjà une série en kW interpolée 15 min → on l'aligne sur l'année
-        pv = pv_kW.reindex(idx, method="nearest").clip(lower=0)
-
-        # Production annuelle réelle issue du CSV
-        annual_pv_kwh_from_csv = (pv * 0.25).sum()
+    if pv_from_file and pv_15m_kW is not None:
+        pv = pv_15m_kW.reindex(idx, method="nearest").clip(lower=0)
     else:
-        # Profil synthétique basé sur la puissance installée
+        # Pas de fichier → profil synthétique calibré avec productible spécifique
         pv = build_pv_profile(pv_kwc)
-        pv *= pv_total_kwh / pv.sum()   # Mise à l’échelle sur le productible spécifique
-        annual_pv_kwh_from_csv = pv_total_kwh
-
+        if pv_total_kwh > 0:
+            pv *= pv_total_kwh / pv.sum()
 else:
-    # Pas de PV dans le système
-    pv = pd.Series(np.zeros(8760), index=idx)
-    annual_pv_kwh_from_csv = 0
+    pv = pd.Series(np.zeros(len(idx)), index=idx)
 
 
 
