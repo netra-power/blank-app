@@ -355,10 +355,6 @@ with st.sidebar:
             )
 
     
-        if pv_upload is None:
-            st.info("ℹ️ Aucun fichier importé — saisissez la production annuelle ci-dessous.")
-
-    
         # ✅ NOUVEAU — on remplace la saisie en kWh/an par productible spécifique
         specific_yield = st.number_input(
             "Productible PV (kWh/kWc/an)",
