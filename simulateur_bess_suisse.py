@@ -322,16 +322,56 @@ load = load.reindex(idx, method="nearest")
 
 
 if has_pv:
-    if pv_upload:
-        pv_df = pd.read_csv(pv_upload, header=None, sep=None, engine="python")
-        pv = ensure_len(pv_df.iloc[:, 0].values, 8760)
-        pv = pd.Series(pv, index=idx)
+    st.markdown("### 📂 Import profil PV (même format que la conso)")
+
+    pv_upload = st.file_uploader("Importer un fichier CSV PV", type=["csv"])
+
+    if pv_upload is not None:
+        df_pv = pd.read_csv(pv_upload, sep=";", header=None, dtype=str)
+        df_pv.columns = ["DateHeure", "PV"]
+
+        unit_pv = df_pv.iloc[1,1].strip()
+        df_pv = df_pv.iloc[2:].copy()
+
+        df_pv["DateHeure"] = pd.to_datetime(df_pv["DateHeure"], format="%d.%m.%Y %H:%M", errors="coerce")
+        df_pv["PV"] = df_pv["PV"].str.replace(",", ".", regex=False).astype(float)
+
+        unit_clean = unit_pv.lower().replace(" ", "")
+
+        if unit_clean in ["(kw)", "kw"]:
+            st.success("✅ Profil PV importé en puissance (kW)")
+            pv_kW = df_pv.set_index("DateHeure")["PV"].rename("PV_kW")
+
+        elif unit_clean in ["(kwh)", "kwh"]:
+            st.success("✅ Profil PV importé en énergie (kWh) → conversion en kW")
+            df_pv = df_pv.sort_values("DateHeure")
+            pv_kW = (df_pv["PV"].astype(float) * 4)   # kWh → kW pour pas 15 min
+            pv_kW.index = df_pv["DateHeure"]
+            pv_kW = pv_kW.rename("PV_kW")
+
+        else:
+            st.error("⚠️ L'unité en B2 doit être `(kW)` ou `(kWh)`.")
+            st.stop()
+
+        # Tri + suppression doublons + NaT
+        pv_kW = pv_kW.sort_index()
+        pv_kW = pv_kW[~pv_kW.index.duplicated(keep="first")]
+        pv_kW = pv_kW[pv_kW.index.notna()]
+
+        # Mise sur grille 15 min
+        idx_15 = pd.date_range(pv_kW.index.min(), pv_kW.index.max(), freq="15T")
+        pv_kW = pv_kW.reindex(idx_15)
+        pv_kW = pv_kW.interpolate(method="time")
+
+        # Final : alignement sur l'année modèle
+        pv = pv_kW.reindex(idx, method="nearest").clip(lower=0)
+
     else:
+        # profil synthétique (inchangé)
         pv = build_pv_profile(pv_kwc)
         if pv_total_kwh > 0:
             pv *= pv_total_kwh / pv.sum()
-else:
-    pv = pd.Series(np.zeros(8760), index=idx)
+
 
 # -----------------------------
 # Prix de l'électricité
