@@ -303,14 +303,27 @@ with st.sidebar:
         # ✅ NOUVEAU — on remplace la saisie en kWh/an par productible spécifique
         specific_yield = st.number_input(
             "Productible PV (kWh/kWc/an)",
-            min_value=200.0, max_value=2000.0, value=1100.0, step=10.0,
+            min_value=200.0, max_value=2000.0, value=1000.0, step=10.0,
             format="%.0f",
             help="Ex : Suisse Romande typique ≈ 1000–1200 kWh/kWc/an"
         )
     
         # ✅ Calcul automatique du productible total annuel
         pv_total_kwh = pv_kwc * specific_yield
-    
+
+        # Affichage style "bulle" comme la conso
+        annual_pv_display = f"{pv_total_kwh:,.0f}".replace(",", " ")
+        
+        st.markdown(
+            f"""
+            <div style="margin-top:0.5rem; margin-bottom:0.5rem;">
+                <span style="font-size:0.9rem; color:#6c757d;">Production annuelle estimée (calculée)</span><br>
+                <span style="font-size:1.1rem; font-weight:600;">{annual_pv_display} kWh</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
     else:
         pv_kwc = pv_kva = pv_total_kwh = 0.0
         pv_upload = None
@@ -392,7 +405,23 @@ if has_pv:
         pv_kW = pv_kW.interpolate(method="time")
 
         # Final : alignement sur l'année modèle
+        pv_kW = pv_kW.reindex(idx_15).interpolate(method="time")
         pv = pv_kW.reindex(idx, method="nearest").clip(lower=0)
+
+        # ✅ AJOUT ICI — Bulle production annuelle issue du fichier
+        annual_pv_kwh_from_csv = (pv * 0.25).sum()   # kW × 0.25h (15 min)
+        annual_pv_display = f"{annual_pv_kwh_from_csv:,.0f}".replace(",", " ")
+
+        st.markdown(
+            f"""
+            <div style="margin-top:0.5rem; margin-bottom:0.5rem;">
+                <span style="font-size:0.9rem; color:#6c757d;">Production annuelle (profil importé)</span><br>
+                <span style="font-size:1.1rem; font-weight:600;">{annual_pv_display} kWh</span>
+            </div>
+            """,
+            unsafe_allow_html=True
+        )
+
 
     else:
         # profil synthétique (inchangé)
