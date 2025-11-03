@@ -174,6 +174,15 @@ with st.sidebar:
     st.markdown("### 📂 Profil de consommation du bâtiment")
 
     cons_upload = st.file_uploader("Importer un fichier CSV de consommation (optionnel)", type=["csv"])
+    st.markdown(
+    "> ⚙️ **Format CSV consommation attendu :**\n"
+    "> - Fichier CSV séparateur `;`\n"
+    "> - Ligne 1 : `(DateHeure ; Valeur)`\n"
+    "> - Ligne 2 : unité dans la 2e colonne → `(kW)` ou `(kWh)`\n"
+    "> - Puis les données → `dd.mm.yyyy HH:MM ; valeur`\n"
+    "> - Pas obligatoire d’avoir 8760 valeurs (le pas sera détecté & interpolé)"
+)
+
 
     if cons_upload is not None:
         import pandas as pd
