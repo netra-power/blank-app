@@ -361,6 +361,27 @@ load = consum_kW.copy()
 # ✅ Harmonisation du pas de temps sur l’année complète
 load = load.reindex(idx, method="nearest")
 
+# -----------------------------
+# Profil PV final (à partir du choix dans la sidebar)
+# -----------------------------
+if has_pv:
+
+    if pv_upload is not None:
+        # pv_kW est déjà une série en kW interpolée 15 min → on l'aligne sur l'année
+        pv = pv_kW.reindex(idx, method="nearest").clip(lower=0)
+
+        # Production annuelle réelle issue du CSV
+        annual_pv_kwh_from_csv = (pv * 0.25).sum()
+    else:
+        # Profil synthétique basé sur la puissance installée
+        pv = build_pv_profile(pv_kwc)
+        pv *= pv_total_kwh / pv.sum()   # Mise à l’échelle sur le productible spécifique
+        annual_pv_kwh_from_csv = pv_total_kwh
+
+else:
+    # Pas de PV dans le système
+    pv = pd.Series(np.zeros(8760), index=idx)
+    annual_pv_kwh_from_csv = 0
 
 
 
