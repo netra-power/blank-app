@@ -288,6 +288,7 @@ with st.sidebar:
         st.subheader("☀️ Photovoltaïque")
         pv_kwc = st.number_input("Puissance installée (kWc)", min_value=0.0, value=275.0, step=1.0, format="%.0f")
         pv_kva = st.number_input("Puissance apparente (kVA)", min_value=0.0, value=200.0, step=1.0, format="%.0f")
+        pv_upload = st.file_uploader("Importer un fichier CSV de production (optionnel)", type=["csv"])
         st.markdown(
             "> ⚙️ **Format CSV PV attendu :**\n"
             "> - Fichier CSV séparateur `;`\n"
@@ -296,7 +297,7 @@ with st.sidebar:
             "> - Puis les données → `dd.mm.yyyy HH:MM ; valeur`\n"
         )
 
-        pv_upload = st.file_uploader("Importer profil PV (CSV)", type=["csv"])
+    
         pv_total_kwh = st.number_input("Production annuelle estimée (kWh)", min_value=0.0, value=300000.0, step=1000.0, format="%.0f")
     else:
         pv_kwc = pv_kva = pv_total_kwh = 0.0
