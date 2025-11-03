@@ -289,6 +289,8 @@ with st.sidebar:
         pv_kwc = st.number_input("Puissance installée (kWc)", min_value=0.0, value=275.0, step=1.0, format="%.0f")
         pv_kva = st.number_input("Puissance apparente (kVA)", min_value=0.0, value=200.0, step=1.0, format="%.0f")
         pv_upload = st.file_uploader("Importer un fichier CSV de production (optionnel)", type=["csv"])
+        if pv_upload is None:
+            st.info("ℹ️ Aucun fichier importé — saisissez la production annuelle ci-dessous.")
         st.markdown(
             "> ⚙️ **Format CSV PV attendu :**\n"
             "> - Fichier CSV séparateur `;`\n"
