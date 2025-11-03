@@ -300,7 +300,17 @@ with st.sidebar:
             st.info("ℹ️ Aucun fichier importé — saisissez la production annuelle ci-dessous.")
 
     
-        pv_total_kwh = st.number_input("Production annuelle estimée (kWh)", min_value=0.0, value=300000.0, step=1000.0, format="%.0f")
+        # ✅ NOUVEAU — on remplace la saisie en kWh/an par productible spécifique
+        specific_yield = st.number_input(
+            "Productible PV (kWh/kWc/an)",
+            min_value=200.0, max_value=2000.0, value=1100.0, step=10.0,
+            format="%.0f",
+            help="Ex : Suisse Romande typique ≈ 1000–1200 kWh/kWc/an"
+        )
+    
+        # ✅ Calcul automatique du productible total annuel
+        pv_total_kwh = pv_kwc * specific_yield
+    
     else:
         pv_kwc = pv_kva = pv_total_kwh = 0.0
         pv_upload = None
