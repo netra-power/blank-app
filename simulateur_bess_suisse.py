@@ -17,7 +17,9 @@ NEUTRAL_YEAR = 2001  # 8760 h (non-leap)
 
 def neutral_hours():
     import pandas as pd
-    return pd.date_range(f"{NEUTRAL_YEAR}-01-01 00:00", periods=8760, freq="1H")
+    from datetime import datetime
+    NEUTRAL_YEAR = 2001
+    return pd.date_range(start=datetime(NEUTRAL_YEAR,1,1,0,0), periods=8760, freq="H")
 
 def to_neutral_year(dt):
     try:
@@ -85,7 +87,10 @@ def ensure_len(arr, n=8760):
     return arr[:n]
 
 def neutral_hours():
-    return pd.date_range(datetime(start_year, 1, 1, 0, 0), periods=8760, freq="H")
+    import pandas as pd
+    from datetime import datetime
+    NEUTRAL_YEAR = 2001
+    return pd.date_range(start=datetime(NEUTRAL_YEAR,1,1,0,0), periods=8760, freq="H")
 
 def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     rng = np.random.RandomState(seed)
@@ -416,7 +421,7 @@ with st.sidebar:
             min_value=100.0, max_value=10_000_000.0, value=670_000.0
         )
 
-        consum_kW = build_consumption_profile(building_kind, annual_kwh, start_year=2024)
+        consum_kW = build_consumption_profile(building_kind, annual_kwh)
 
 
     has_pv = "PV" in system_type
