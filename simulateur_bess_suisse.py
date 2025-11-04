@@ -3,31 +3,11 @@
 # Conserve toutes les fonctionnalités précédentes + corrections et UI améliorée
 
 from datetime import datetime, timedelta
-
-P_DC_TPL = 123.0  # kWc template
 import xml.etree.ElementTree as ET
 import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
-import matplotlib.dates as mdates
-
-# === Neutral year settings (no calendar coupling) ===
-NEUTRAL_YEAR = 2001  # 8760 h (non-leap)
-
-def neutral_hours():
-    import pandas as pd
-    from datetime import datetime
-    NEUTRAL_YEAR = 2001
-    return pd.date_range(start=datetime(NEUTRAL_YEAR,1,1,0,0), periods=8760, freq="H")
-
-def to_neutral_year(dt):
-    try:
-        return dt.replace(year=NEUTRAL_YEAR)
-    except Exception:
-        return dt
-
-import os
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
 
@@ -86,11 +66,8 @@ def ensure_len(arr, n=8760):
         return np.concatenate([arr, tail])
     return arr[:n]
 
-def neutral_hours():
-    import pandas as pd
-    from datetime import datetime
-    NEUTRAL_YEAR = 2001
-    return pd.date_range(start=datetime(NEUTRAL_YEAR,1,1,0,0), periods=8760, freq="H")
+def year_hours(start_year=2024):
+    return pd.date_range(datetime(start_year, 1, 1, 0, 0), periods=8760, freq="H")
 
 def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     rng = np.random.RandomState(seed)
@@ -111,110 +88,16 @@ def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     prof = daily * seasonal * noise
     prof[prof < 0] = 0
     prof *= annual_kwh / prof.sum()
-    return pd.Series(prof, index=neutral_hours())
-
-
+    return pd.Series(prof, index=year_hours(start_year))
 
 def build_pv_profile(kWc, start_year=2024):
-    idx = neutral_hours()
+    idx = year_hours(start_year)
     t = np.arange(len(idx))
     day = np.clip(np.sin(2*np.pi*((t%24)-6)/24), 0, None)
     seasonal = (np.sin(2*np.pi*t/(24*365)-0.1)+1)/2 * 0.7 + 0.3
     raw = kWc * day * seasonal
     raw *= (1000.0*kWc)/raw.sum()
     return pd.Series(raw, index=idx)
-
-
-# === Index normalization helpers ===
-def normalize_to_neutral(s):
-    if s is None:
-        return None
-    if not hasattr(s, 'index'):
-        return s
-    try:
-        s.index = s.index.map(to_neutral_year)
-        s = s.sort_index()
-    except Exception:
-        pass
-    return s
-# === PVSyst helpers (shape) ===
-
-
-
-def load_pvsyst_eoutinv(path):
-    """
-    Loader PVSyst ultra-robuste pour fichiers du type :
-    date;EOutInv
-        ;kW
-    01/01/90 00:00;-0,0035
-    ...
-    Retourne une série horaire en kW (index datetime), pas_h = 1.0
-    """
-    import pandas as pd
-
-    # Lecture brute des lignes
-    try:
-        with open(path, encoding="latin-1") as f:
-            lines = f.read().splitlines()
-    except FileNotFoundError:
-        return None, None
-
-    # Trouve la ligne d'en-tête "date;..."
-    header_idx = None
-    for i, ln in enumerate(lines):
-        if ln.strip().lower().startswith("date;"):
-            header_idx = i
-            break
-    if header_idx is None:
-        return None, None
-
-    # Construit les lignes utiles (ignore la ligne d'unités contenant 'kW')
-    rows = []
-    for ln in lines[header_idx+1:]:
-        if not ln.strip():
-            continue
-        parts = [p.strip() for p in ln.split(";")]
-        if len(parts) < 2:
-            continue
-        # ignore ligne d'unités
-        if any("kw" in p.lower() for p in parts):
-            continue
-        # garde seulement 2 colonnes: date ; valeur
-        rows.append(parts[:2])
-
-    if not rows:
-        return None, None
-
-    df = pd.DataFrame(rows, columns=["date", "EOutInv"])
-    # Normalisation décimale et parsing
-    df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce")
-    df["EOutInv"] = (
-        df["EOutInv"].astype(str).str.replace(",", ".", regex=False)
-    )
-    # Filtre les lignes vraiment numériques
-    df = df[df["EOutInv"].str.match(r"^-?\d+(\.\d+)?$", na=False)]
-    df["EOutInv"] = df["EOutInv"].astype(float)
-
-    df = df.dropna(subset=["date"])
-    if df.empty:
-        return None, None
-
-    s = df.set_index("date")["EOutInv"]
-        # Force neutral year for alignment
-    s.index = s.index.map(to_neutral_year)
-    s = s.sort_index()
-    return s, 1.0
-def shape_from_template(template_kWh):
-    total = template_kWh.sum()
-    if total <= 0:
-        return None
-    return template_kWh / total
-
-def build_pv_from_shape(shape, target_energy_kWh, idx_target):
-    shp = shape.reindex(idx_target, method="nearest")
-    shp = shp / shp.sum()
-    pv_kWh = shp * target_energy_kWh
-    return pd.Series(np.maximum(pv_kWh, 0.0), index=idx_target)
 
 def parse_entsoe_a44(xml_text):
     root = ET.fromstring(xml_text)
@@ -274,25 +157,6 @@ st.caption("Devise: CHF — Profils horaires sur 1 an (8760 h)")
 
 # ==== Place ceci juste AVANT: with st.sidebar: ====
 pv_from_file = False
-# Preload PVSyst shapes
-PVSYST_SUD_PATH = "/mnt/data/pvsyst_125_sud.CSV"
-PVSYST_EO_PATH  = "/mnt/data/pvsyst_125_est_ouest.CSV"
-
-pv_shape_sud = pv_shape_eo = None
-try:
-    s_sud, pas_sud = load_pvsyst_eoutinv(PVSYST_SUD_PATH)
-    if s_sud is not None:
-        pv_shape_sud = shape_from_template(s_sud)
-except:
-    pass
-
-try:
-    s_eo, pas_eo = load_pvsyst_eoutinv(PVSYST_EO_PATH)
-    if s_eo is not None:
-        pv_shape_eo = shape_from_template(s_eo)
-except:
-    pass
-
 pv_15m_kW = None
 
 
@@ -421,7 +285,7 @@ with st.sidebar:
             min_value=100.0, max_value=10_000_000.0, value=670_000.0
         )
 
-        consum_kW = build_consumption_profile(building_kind, annual_kwh)
+        consum_kW = build_consumption_profile(building_kind, annual_kwh, start_year=2024)
 
 
     has_pv = "PV" in system_type
@@ -499,14 +363,6 @@ with st.sidebar:
             help="Ex : Suisse Romande typique ≈ 1000–1200 kWh/kWc/an"
         )
     
-
-        # Orientation & Inclinaison
-        orientation = st.selectbox("Orientation", ["Sud", "E-O"])
-        inclination = st.number_input("Inclinaison (°)", min_value=0, max_value=60, value=10, step=1)
-        f_incl = np.interp(inclination, [0,10,20,30,35,45], [0.90,1.00,1.04,1.08,1.10,1.05])
-        specific_yield_effective = specific_yield * f_incl
-        st.caption(f"Productible corrigé inclinaison : ~{specific_yield_effective:.0f} kWh/kWc/an")
-
         # ✅ Calcul automatique du productible total annuel
         pv_total_kwh = pv_kwc * specific_yield
 
@@ -541,8 +397,7 @@ with st.sidebar:
 
     st.subheader("🔌 Tarification & services")
     if marche_libre == "Non":
-        price_auto = st.number_input("Tarif autoconsommation (CHF/kWh)", min_value=0.0, value=0.18, step=0.01)
-        price_buy_fixed = st.number_input("Tarif achat réseau (CHF/kWh)", min_value=0.0, value=0.229, step=0.01)
+        price_buy_fixed = st.number_input("Tarif achat (CHF/kWh)", min_value=0.0, value=0.229, step=0.01)
         price_sell_fixed = st.number_input("Tarif revente PV (CHF/kWh)", min_value=0.0, value=0.053, step=0.01)
     else:
         price_buy_fixed = price_sell_fixed = None
@@ -553,7 +408,7 @@ with st.sidebar:
 # -----------------------------
 # Profils (conso & PV)
 # -----------------------------
-idx = neutral_hours()
+idx = year_hours(2024)
 
 # ✅ Toujours utiliser consum_kW (qu'il vienne du CSV ou du profil synthétique)
 load = consum_kW.copy()
@@ -562,28 +417,20 @@ load = consum_kW.copy()
 load = load.reindex(idx, method="nearest")
 
 
-
 # ---- Profil PV final (en kW sur idx annuel) ----
 if has_pv:
     if pv_from_file and pv_15m_kW is not None:
-        # ✅ CSV importé → pas de clipping
-        pv = pv_15m_kW.reindex(idx, method="nearest").clip(lower=0.0)
+        pv = pv_15m_kW.reindex(idx, method="nearest").clip(lower=0)
     else:
-        # ✅ Pas de CSV → utiliser template PVSyst + scaling DC + clipping AC
-        if orientation == "Sud":
-            tpl_series, _ = load_pvsyst_eoutinv(os.path.join(os.path.dirname(__file__), "pvsyst_125_sud.CSV"))
-        else:
-            tpl_series, _ = load_pvsyst_eoutinv(os.path.join(os.path.dirname(__file__), "pvsyst_125_est_ouest.CSV"))
-
-        if tpl_series is None:
-            pv = build_pv_profile(pv_kwc)
-        else:
-            tpl_kW = tpl_series.reindex(idx, method="nearest").clip(lower=0.0)
-            scale = pv_kwc / P_DC_TPL
-            pv = tpl_kW * scale
-            pv = pv.clip(upper=1.1 * pv_kva)
+        # Pas de fichier → profil synthétique calibré avec productible spécifique
+        pv = build_pv_profile(pv_kwc)
+        if pv_total_kwh > 0:
+            pv *= pv_total_kwh / pv.sum()
 else:
     pv = pd.Series(np.zeros(len(idx)), index=idx)
+
+
+
 # -----------------------------
 # Prix de l'électricité
 # -----------------------------
@@ -696,7 +543,7 @@ autoconso_with_bess = ((pv_self.sum()+pv_to_batt.sum())/pv.sum()*100) if pv.sum(
 # Revenus
 # -----------------------------
 if marche_libre == "Non":
-    rev_pv_auto = pv_self.sum() * price_auto
+    rev_pv_auto = pv_self.sum() * price_buy_fixed
     rev_pv_export = pv_export.sum() * price_sell_fixed
 else:
     rev_pv_auto = (pv_self * prices).sum()
@@ -774,7 +621,6 @@ with right_cf:
     for spine in ax.spines.values():
         spine.set_linewidth(0.4)   # bordures fines
         spine.set_color("#CCCCCC") # gris doux
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
     ax.plot(cum_years, cum_discounted, linewidth=1.3, color=COLORS["bess_charge"])
     ax.axhline(0, color="#CCCCCC", linewidth=0.8, linestyle="--")
     # Graduation tous les 50k CHF
@@ -966,9 +812,7 @@ for (label, conso_day, pv_day, ch_day, dis_day, col) in [
     fig, ax = plt.subplots(figsize=(8, 3), dpi=150)
 
     # Conso & PV
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
     ax.plot(conso_day.index, conso_day.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
     ax.plot(conso_day.index, pv_day.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
 
     # Autoconsommation (hachurée)
@@ -976,9 +820,7 @@ for (label, conso_day, pv_day, ch_day, dis_day, col) in [
     ax.fill_between(conso_day.index, 0, auto, color=COLORS["pv"], alpha=0.22, hatch="//", label="Autoconsommation")
 
     # Réseau
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
     ax.plot(conso_day.index, grid_import.values, linestyle="--", linewidth=1.4, color=COLORS["grid_import"], label="Soutirage réseau (kW)")
-    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
     ax.plot(conso_day.index, grid_export.values, linestyle=":", linewidth=1.4, color=COLORS["grid_export"], label="Injection réseau (kW)")
 
     ax.set_title(label, color=COLORS["text"])
