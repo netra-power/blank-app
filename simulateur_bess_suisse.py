@@ -105,22 +105,24 @@ def build_pv_profile(kWc, start_year=2024):
 
 # === PVSyst helpers (shape) ===
 def load_pvsyst_eoutinv(path):
-    try:
-        df = pd.read_csv(path, sep=";", header=None, dtype=str, encoding="latin-1", on_bad_lines="skip")
-    except Exception:
+    """Charge puissance AC PVSyst (EOutInv)."""
+    import pandas as pd
+    # Detect header
+    header_line = None
+    with open(path, encoding="latin-1") as f:
+        for i, line in enumerate(f):
+            if line.lower().startswith("date;"):
+                header_line = i
+                break
+    if header_line is None:
         return None, None
-    keep = df[0].astype(str).str.contains("/", na=False)
-    df = df.loc[keep, [0, 1]].copy()
-    if df.empty:
-        return None, None
-    df.columns = ["DateHeure", "Valeur"]
-    df["DateHeure"] = pd.to_datetime(df["DateHeure"], dayfirst=True, errors="coerce")
-    df["Valeur"] = df["Valeur"].str.replace(",", ".", regex=False).astype(float)
-    df = df.dropna(subset=["DateHeure"]).sort_values("DateHeure")
-    s = df.set_index("DateHeure")["Valeur"].clip(lower=0)
-    dt_sec = s.index.to_series().diff().dropna().dt.total_seconds().mode().iloc[0]
-    pas_h = dt_sec / 3600.0
-    return s, pas_h
+    df = pd.read_csv(path, sep=";", skiprows=header_line, encoding="latin-1")
+    if df.iloc[0,0].lower() == "date":
+        df = df.iloc[1:].copy()
+    df['date'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
+    df['EOutInv'] = df['EOutInv'].astype(str).str.replace(",", ".", regex=False).astype(float)
+    s = df.set_index('date')['EOutInv'].dropna()
+    return s, 1.0
 
 def shape_from_template(template_kWh):
     total = template_kWh.sum()
@@ -489,9 +491,9 @@ if has_pv:
     else:
         # ✅ Pas de CSV → utiliser template PVSyst + scaling DC + clipping AC
         if orientation == "Sud":
-            tpl_series, _ = load_pvsyst_eoutinv("pvsyst_125_sud.CSV")
+            tpl_series, _ = load_pvsyst_eoutinv(os.path.join(os.path.dirname(__file__), "pvsyst_125_sud.CSV"))
         else:
-            tpl_series, _ = load_pvsyst_eoutinv("pvsyst_125_est_ouest.CSV")
+            tpl_series, _ = load_pvsyst_eoutinv(os.path.join(os.path.dirname(__file__), "pvsyst_125_est_ouest.CSV"))
 
         if tpl_series is None:
             pv = build_pv_profile(pv_kwc)
