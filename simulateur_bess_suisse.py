@@ -90,8 +90,17 @@ def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     prof *= annual_kwh / prof.sum()
     return pd.Series(prof, index=year_hours(start_year))
 
+
+
 def build_pv_profile(kWc, start_year=2024):
-    
+    idx = year_hours(start_year)
+    t = np.arange(len(idx))
+    day = np.clip(np.sin(2*np.pi*((t%24)-6)/24), 0, None)
+    seasonal = (np.sin(2*np.pi*t/(24*365)-0.1)+1)/2 * 0.7 + 0.3
+    raw = kWc * day * seasonal
+    raw *= (1000.0*kWc)/raw.sum()
+    return pd.Series(raw, index=idx)
+
 # === PVSyst helpers (shape) ===
 def load_pvsyst_eoutinv(path):
     try:
@@ -100,7 +109,8 @@ def load_pvsyst_eoutinv(path):
         return None, None
     keep = df[0].astype(str).str.contains("/", na=False)
     df = df.loc[keep, [0, 1]].copy()
-    if df.empty: return None, None
+    if df.empty:
+        return None, None
     df.columns = ["DateHeure", "Valeur"]
     df["DateHeure"] = pd.to_datetime(df["DateHeure"], dayfirst=True, errors="coerce")
     df["Valeur"] = df["Valeur"].str.replace(",", ".", regex=False).astype(float)
@@ -112,7 +122,8 @@ def load_pvsyst_eoutinv(path):
 
 def shape_from_template(template_kWh):
     total = template_kWh.sum()
-    if total <= 0: return None
+    if total <= 0:
+        return None
     return template_kWh / total
 
 def build_pv_from_shape(shape, target_energy_kWh, idx_target):
@@ -120,14 +131,6 @@ def build_pv_from_shape(shape, target_energy_kWh, idx_target):
     shp = shp / shp.sum()
     pv_kWh = shp * target_energy_kWh
     return pd.Series(np.maximum(pv_kWh, 0.0), index=idx_target)
-
-    idx = year_hours(start_year)
-    t = np.arange(len(idx))
-    day = np.clip(np.sin(2*np.pi*((t%24)-6)/24), 0, None)
-    seasonal = (np.sin(2*np.pi*t/(24*365)-0.1)+1)/2 * 0.7 + 0.3
-    raw = kWc * day * seasonal
-    raw *= (1000.0*kWc)/raw.sum()
-    return pd.Series(raw, index=idx)
 
 def parse_entsoe_a44(xml_text):
     root = ET.fromstring(xml_text)
