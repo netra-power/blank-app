@@ -10,6 +10,21 @@ import numpy as np
 import pandas as pd
 import requests
 import streamlit as st
+import matplotlib.dates as mdates
+
+# === Neutral year settings (no calendar coupling) ===
+NEUTRAL_YEAR = 2001  # 8760 h (non-leap)
+
+def neutral_hours():
+    import pandas as pd
+    return pd.date_range(f"{NEUTRAL_YEAR}-01-01 00:00", periods=8760, freq="1H")
+
+def to_neutral_year(dt):
+    try:
+        return dt.replace(year=NEUTRAL_YEAR)
+    except Exception:
+        return dt
+
 import os
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
@@ -69,7 +84,7 @@ def ensure_len(arr, n=8760):
         return np.concatenate([arr, tail])
     return arr[:n]
 
-def year_hours(start_year=2024):
+def neutral_hours():
     return pd.date_range(datetime(start_year, 1, 1, 0, 0), periods=8760, freq="H")
 
 def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
@@ -91,12 +106,12 @@ def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     prof = daily * seasonal * noise
     prof[prof < 0] = 0
     prof *= annual_kwh / prof.sum()
-    return pd.Series(prof, index=year_hours(start_year))
+    return pd.Series(prof, index=neutral_hours())
 
 
 
 def build_pv_profile(kWc, start_year=2024):
-    idx = year_hours(start_year)
+    idx = neutral_hours()
     t = np.arange(len(idx))
     day = np.clip(np.sin(2*np.pi*((t%24)-6)/24), 0, None)
     seasonal = (np.sin(2*np.pi*t/(24*365)-0.1)+1)/2 * 0.7 + 0.3
@@ -104,6 +119,19 @@ def build_pv_profile(kWc, start_year=2024):
     raw *= (1000.0*kWc)/raw.sum()
     return pd.Series(raw, index=idx)
 
+
+# === Index normalization helpers ===
+def normalize_to_neutral(s):
+    if s is None:
+        return None
+    if not hasattr(s, 'index'):
+        return s
+    try:
+        s.index = s.index.map(to_neutral_year)
+        s = s.sort_index()
+    except Exception:
+        pass
+    return s
 # === PVSyst helpers (shape) ===
 
 
@@ -167,10 +195,10 @@ def load_pvsyst_eoutinv(path):
         return None, None
 
     s = df.set_index("date")["EOutInv"]
+        # Force neutral year for alignment
+    s.index = s.index.map(to_neutral_year)
+    s = s.sort_index()
     return s, 1.0
-
-
-
 def shape_from_template(template_kWh):
     total = template_kWh.sum()
     if total <= 0:
@@ -520,7 +548,7 @@ with st.sidebar:
 # -----------------------------
 # Profils (conso & PV)
 # -----------------------------
-idx = year_hours(2024)
+idx = neutral_hours()
 
 # ✅ Toujours utiliser consum_kW (qu'il vienne du CSV ou du profil synthétique)
 load = consum_kW.copy()
@@ -741,6 +769,7 @@ with right_cf:
     for spine in ax.spines.values():
         spine.set_linewidth(0.4)   # bordures fines
         spine.set_color("#CCCCCC") # gris doux
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
     ax.plot(cum_years, cum_discounted, linewidth=1.3, color=COLORS["bess_charge"])
     ax.axhline(0, color="#CCCCCC", linewidth=0.8, linestyle="--")
     # Graduation tous les 50k CHF
@@ -932,7 +961,9 @@ for (label, conso_day, pv_day, ch_day, dis_day, col) in [
     fig, ax = plt.subplots(figsize=(8, 3), dpi=150)
 
     # Conso & PV
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
     ax.plot(conso_day.index, conso_day.values, label="Conso (kW)", color=COLORS["load"], linewidth=1.8)
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
     ax.plot(conso_day.index, pv_day.values, label="PV (kW)", color=COLORS["pv"], linewidth=1.6)
 
     # Autoconsommation (hachurée)
@@ -940,7 +971,9 @@ for (label, conso_day, pv_day, ch_day, dis_day, col) in [
     ax.fill_between(conso_day.index, 0, auto, color=COLORS["pv"], alpha=0.22, hatch="//", label="Autoconsommation")
 
     # Réseau
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
     ax.plot(conso_day.index, grid_import.values, linestyle="--", linewidth=1.4, color=COLORS["grid_import"], label="Soutirage réseau (kW)")
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%d/%m %H:%M'))
     ax.plot(conso_day.index, grid_export.values, linestyle=":", linewidth=1.4, color=COLORS["grid_export"], label="Injection réseau (kW)")
 
     ax.set_title(label, color=COLORS["text"])
