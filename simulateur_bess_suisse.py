@@ -91,6 +91,35 @@ def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     return pd.Series(prof, index=year_hours(start_year))
 
 def build_pv_profile(kWc, start_year=2024):
+# === PVSyst helpers (shape) ===
+def load_pvsyst_eoutinv(path):
+    try:
+        df = pd.read_csv(path, sep=";", header=None, dtype=str, encoding="latin-1", on_bad_lines="skip")
+    except Exception:
+        return None, None
+    keep = df[0].astype(str).str.contains("/", na=False)
+    df = df.loc[keep, [0, 1]].copy()
+    if df.empty: return None, None
+    df.columns = ["DateHeure", "Valeur"]
+    df["DateHeure"] = pd.to_datetime(df["DateHeure"], dayfirst=True, errors="coerce")
+    df["Valeur"] = df["Valeur"].str.replace(",", ".", regex=False).astype(float)
+    df = df.dropna(subset=["DateHeure"]).sort_values("DateHeure")
+    s = df.set_index("DateHeure")["Valeur"].clip(lower=0)
+    dt_sec = s.index.to_series().diff().dropna().dt.total_seconds().mode().iloc[0]
+    pas_h = dt_sec / 3600.0
+    return s, pas_h
+
+def shape_from_template(template_kWh):
+    total = template_kWh.sum()
+    if total <= 0: return None
+    return template_kWh / total
+
+def build_pv_from_shape(shape, target_energy_kWh, idx_target):
+    shp = shape.reindex(idx_target, method="nearest")
+    shp = shp / shp.sum()
+    pv_kWh = shp * target_energy_kWh
+    return pd.Series(np.maximum(pv_kWh, 0.0), index=idx_target)
+
     idx = year_hours(start_year)
     t = np.arange(len(idx))
     day = np.clip(np.sin(2*np.pi*((t%24)-6)/24), 0, None)
@@ -157,6 +186,25 @@ st.caption("Devise: CHF — Profils horaires sur 1 an (8760 h)")
 
 # ==== Place ceci juste AVANT: with st.sidebar: ====
 pv_from_file = False
+# Preload PVSyst shapes
+PVSYST_SUD_PATH = "/mnt/data/pvsyst_125_sud.CSV"
+PVSYST_EO_PATH  = "/mnt/data/pvsyst_125_est_ouest.CSV"
+
+pv_shape_sud = pv_shape_eo = None
+try:
+    s_sud, pas_sud = load_pvsyst_eoutinv(PVSYST_SUD_PATH)
+    if s_sud is not None:
+        pv_shape_sud = shape_from_template(s_sud)
+except:
+    pass
+
+try:
+    s_eo, pas_eo = load_pvsyst_eoutinv(PVSYST_EO_PATH)
+    if s_eo is not None:
+        pv_shape_eo = shape_from_template(s_eo)
+except:
+    pass
+
 pv_15m_kW = None
 
 
@@ -363,6 +411,14 @@ with st.sidebar:
             help="Ex : Suisse Romande typique ≈ 1000–1200 kWh/kWc/an"
         )
     
+
+        # Orientation & Inclinaison
+        orientation = st.selectbox("Orientation", ["Sud", "E-O"])
+        inclination = st.number_input("Inclinaison (°)", min_value=0, max_value=60, value=10, step=1)
+        f_incl = np.interp(inclination, [0,10,20,30,35,45], [0.90,1.00,1.04,1.08,1.10,1.05])
+        specific_yield_effective = specific_yield * f_incl
+        st.caption(f"Productible corrigé inclinaison : ~{specific_yield_effective:.0f} kWh/kWc/an")
+
         # ✅ Calcul automatique du productible total annuel
         pv_total_kwh = pv_kwc * specific_yield
 
@@ -397,7 +453,8 @@ with st.sidebar:
 
     st.subheader("🔌 Tarification & services")
     if marche_libre == "Non":
-        price_buy_fixed = st.number_input("Tarif achat (CHF/kWh)", min_value=0.0, value=0.229, step=0.01)
+        price_auto = st.number_input("Tarif autoconsommation (CHF/kWh)", min_value=0.0, value=0.18, step=0.01)
+        price_buy_fixed = st.number_input("Tarif achat réseau (CHF/kWh)", min_value=0.0, value=0.229, step=0.01)
         price_sell_fixed = st.number_input("Tarif revente PV (CHF/kWh)", min_value=0.0, value=0.053, step=0.01)
     else:
         price_buy_fixed = price_sell_fixed = None
@@ -422,10 +479,20 @@ if has_pv:
     if pv_from_file and pv_15m_kW is not None:
         pv = pv_15m_kW.reindex(idx, method="nearest").clip(lower=0)
     else:
-        # Pas de fichier → profil synthétique calibré avec productible spécifique
-        pv = build_pv_profile(pv_kwc)
-        if pv_total_kwh > 0:
-            pv *= pv_total_kwh / pv.sum()
+        # Pas de fichier -> construire depuis shape
+        shape_sel = None
+        if 'orientation' in locals():
+            if orientation == "Sud" and pv_shape_sud is not None:
+                shape_sel = pv_shape_sud
+            elif orientation == "E-O" and pv_shape_eo is not None:
+                shape_sel = pv_shape_eo
+        if shape_sel is not None:
+            target_energy = pv_kwc * specific_yield_effective
+            pv = build_pv_from_shape(shape_sel, target_energy, idx)
+        else:
+            pv = build_pv_profile(pv_kwc)
+            if pv_total_kwh > 0:
+                pv *= pv_total_kwh / pv.sum()
 else:
     pv = pd.Series(np.zeros(len(idx)), index=idx)
 
@@ -543,7 +610,7 @@ autoconso_with_bess = ((pv_self.sum()+pv_to_batt.sum())/pv.sum()*100) if pv.sum(
 # Revenus
 # -----------------------------
 if marche_libre == "Non":
-    rev_pv_auto = pv_self.sum() * price_buy_fixed
+    rev_pv_auto = pv_self.sum() * price_auto
     rev_pv_export = pv_export.sum() * price_sell_fixed
 else:
     rev_pv_auto = (pv_self * prices).sum()
