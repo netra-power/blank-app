@@ -105,25 +105,44 @@ def build_pv_profile(kWc, start_year=2024):
     return pd.Series(raw, index=idx)
 
 # === PVSyst helpers (shape) ===
+
 def load_pvsyst_eoutinv(path):
-    """Charge puissance AC PVSyst (EOutInv)."""
+    """
+    Charge un fichier PVSyst au format :
+    date;EOutInv
+        ;kW
+    puis série horaire.
+    Retourne une série index datetime en kW.
+    """
     import pandas as pd
-    # Detect header
+
+    # Cherche la ligne d'en-tête réelle contenant "date;EOutInv"
     header_line = None
     with open(path, encoding="latin-1") as f:
         for i, line in enumerate(f):
             if line.lower().startswith("date;"):
                 header_line = i
                 break
+
     if header_line is None:
         return None, None
-    df = pd.read_csv(path, sep=";", skiprows=header_line, encoding="latin-1")
-    if df.iloc[0,0].lower() == "date":
+
+    # Lis le fichier à partir de l'en-tête
+    df = pd.read_csv(path, sep=";", skiprows=header_line, encoding="latin-1", header=0)
+
+    # La ligne suivante est l'unité → on la supprime si présente
+    if df.iloc[0, df.columns.get_loc('EOutInv')].lower() == 'kw':
         df = df.iloc[1:].copy()
-    df['date'] = pd.to_datetime(df['Date'], dayfirst=True, errors='coerce')
+
+    # Convertit colonnes
+    df['date'] = pd.to_datetime(df['date'], dayfirst=True, errors='coerce')
     df['EOutInv'] = df['EOutInv'].astype(str).str.replace(",", ".", regex=False).astype(float)
+
+    # Indexation
     s = df.set_index('date')['EOutInv'].dropna()
-    return s, 1.0
+
+    return s, 1.0  # pas_h = 1 heure
+
 
 def shape_from_template(template_kWh):
     total = template_kWh.sum()
