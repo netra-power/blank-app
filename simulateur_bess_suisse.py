@@ -106,17 +106,18 @@ def build_pv_profile(kWc, start_year=2024):
 
 # === PVSyst helpers (shape) ===
 
+
 def load_pvsyst_eoutinv(path):
     """
-    Charge un fichier PVSyst au format :
+    Charge un fichier PVSyst contenant :
     date;EOutInv
-        ;kW
-    puis série horaire.
-    Retourne une série index datetime en kW.
+     ;kW
+    puis série de valeurs horaires.
+    Retourne une série indexée en datetime (kW).
     """
     import pandas as pd
 
-    # Cherche la ligne d'en-tête réelle contenant "date;EOutInv"
+    # Trouver la vraie ligne d'en-tête
     header_line = None
     with open(path, encoding="latin-1") as f:
         for i, line in enumerate(f):
@@ -127,21 +128,22 @@ def load_pvsyst_eoutinv(path):
     if header_line is None:
         return None, None
 
-    # Lis le fichier à partir de l'en-tête
+    # Lecture avec l'en-tête détecté
     df = pd.read_csv(path, sep=";", skiprows=header_line, encoding="latin-1", header=0)
 
-    # La ligne suivante est l'unité → on la supprime si présente
-    if df.iloc[0, df.columns.get_loc('EOutInv')].lower() == 'kw':
-        df = df.iloc[1:].copy()
+    # Supprimer la ligne d'unités (celle qui contient kW)
+    df = df[~df.apply(lambda row: row.astype(str).str.contains("kW", case=False).any(), axis=1)]
 
-    # Convertit colonnes
+    # Convertir colonne date
     df['date'] = pd.to_datetime(df['date'], dayfirst=True, errors='coerce')
+
+    # Convertir puissance AC (valeurs séparateur virgule → point)
     df['EOutInv'] = df['EOutInv'].astype(str).str.replace(",", ".", regex=False).astype(float)
 
-    # Indexation
+    # Série finale
     s = df.set_index('date')['EOutInv'].dropna()
 
-    return s, 1.0  # pas_h = 1 heure
+    return s, 1.0  # pas horaire
 
 
 def shape_from_template(template_kWh):
