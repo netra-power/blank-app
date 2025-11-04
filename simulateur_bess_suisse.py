@@ -3,6 +3,8 @@
 # Conserve toutes les fonctionnalités précédentes + corrections et UI améliorée
 
 from datetime import datetime, timedelta
+
+P_DC_TPL = 123.0  # kWc template
 import xml.etree.ElementTree as ET
 import numpy as np
 import pandas as pd
@@ -478,31 +480,28 @@ load = consum_kW.copy()
 load = load.reindex(idx, method="nearest")
 
 
+
 # ---- Profil PV final (en kW sur idx annuel) ----
 if has_pv:
     if pv_from_file and pv_15m_kW is not None:
-        # ✅ Profil CSV → on ne clippe pas
-        pv = pv_15m_kW.reindex(idx, method="nearest").clip(lower=0)
+        # ✅ CSV importé → pas de clipping
+        pv = pv_15m_kW.reindex(idx, method="nearest").clip(lower=0.0)
     else:
-        # ✅ Pas de fichier → profil synthétique ou PVSyst
-        shape_sel = None
-        if 'orientation' in locals():
-            if orientation == "Sud" and pv_shape_sud is not None:
-                shape_sel = pv_shape_sud
-            elif orientation == "E-O" and pv_shape_eo is not None:
-                shape_sel = pv_shape_eo
-        if shape_sel is not None:
-            target_energy = pv_kwc * specific_yield_effective
-            pv = build_pv_from_shape(shape_sel, target_energy, idx)
+        # ✅ Pas de CSV → utiliser template PVSyst + scaling DC + clipping AC
+        if orientation == "Sud":
+            tpl_series, _ = load_pvsyst_eoutinv("pvsyst_125_sud.CSV")
         else:
+            tpl_series, _ = load_pvsyst_eoutinv("pvsyst_125_est_ouest.CSV")
+
+        if tpl_series is None:
             pv = build_pv_profile(pv_kwc)
-            if pv_total_kwh > 0:
-                pv *= pv_total_kwh / pv.sum()
-        # ✅ Limitation onduleur AC (10% tolérance)
-        pv = pv.clip(upper = 1.1 * pv_kva)
+        else:
+            tpl_kW = tpl_series.reindex(idx, method="nearest").clip(lower=0.0)
+            scale = pv_kwc / P_DC_TPL
+            pv = tpl_kW * scale
+            pv = pv.clip(upper=1.1 * pv_kva)
 else:
     pv = pd.Series(np.zeros(len(idx)), index=idx)
-
 # -----------------------------
 # Prix de l'électricité
 # -----------------------------
