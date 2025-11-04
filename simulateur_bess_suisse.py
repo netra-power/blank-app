@@ -91,6 +91,7 @@ def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     return pd.Series(prof, index=year_hours(start_year))
 
 def build_pv_profile(kWc, start_year=2024):
+    
 # === PVSyst helpers (shape) ===
 def load_pvsyst_eoutinv(path):
     try:
