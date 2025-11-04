@@ -86,11 +86,7 @@ def ensure_len(arr, n=8760):
         return np.concatenate([arr, tail])
     return arr[:n]
 
-def neutral_hours():
-    import pandas as pd
-    from datetime import datetime
-    NEUTRAL_YEAR = 2001
-    return pd.date_range(start=datetime(NEUTRAL_YEAR,1,1,0,0), periods=8760, freq="H")
+# (duplicate neutral_hours removed)
 
 def build_consumption_profile(kind, annual_kwh, seed=7, start_year=2024):
     rng = np.random.RandomState(seed)
@@ -474,6 +470,10 @@ with st.sidebar:
             idx_15 = pd.date_range(pv_serie.index.min(), pv_serie.index.max(), freq="15T")
             pv_15m_kW = pv_serie.reindex(idx_15).interpolate(method="time")
         
+
+            # ✅ Remap vers l'année neutre pour alignement global
+            pv_15m_kW.index = pv_15m_kW.index.map(to_neutral_year)
+            pv_15m_kW = pv_15m_kW.sort_index()
             # Flag pour l’étape suivante
             pv_from_file = True
         
@@ -508,7 +508,7 @@ with st.sidebar:
         st.caption(f"Productible corrigé inclinaison : ~{specific_yield_effective:.0f} kWh/kWc/an")
 
         # ✅ Calcul automatique du productible total annuel
-        pv_total_kwh = pv_kwc * specific_yield
+        pv_total_kwh = pv_kwc * specific_yield_effective
 
         # Affichage style "bulle" comme la conso
         annual_pv_display = f"{pv_total_kwh:,.0f}".replace(",", " ")
