@@ -481,9 +481,10 @@ load = load.reindex(idx, method="nearest")
 # ---- Profil PV final (en kW sur idx annuel) ----
 if has_pv:
     if pv_from_file and pv_15m_kW is not None:
+        # ✅ Profil CSV → on ne clippe pas
         pv = pv_15m_kW.reindex(idx, method="nearest").clip(lower=0)
     else:
-        # Pas de fichier -> construire depuis shape
+        # ✅ Pas de fichier → profil synthétique ou PVSyst
         shape_sel = None
         if 'orientation' in locals():
             if orientation == "Sud" and pv_shape_sud is not None:
@@ -497,10 +498,10 @@ if has_pv:
             pv = build_pv_profile(pv_kwc)
             if pv_total_kwh > 0:
                 pv *= pv_total_kwh / pv.sum()
+        # ✅ Limitation onduleur AC (10% tolérance)
+        pv = pv.clip(upper = 1.1 * pv_kva)
 else:
     pv = pd.Series(np.zeros(len(idx)), index=idx)
-
-
 
 # -----------------------------
 # Prix de l'électricité
