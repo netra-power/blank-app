@@ -107,43 +107,68 @@ def build_pv_profile(kWc, start_year=2024):
 # === PVSyst helpers (shape) ===
 
 
+
 def load_pvsyst_eoutinv(path):
     """
-    Charge un fichier PVSyst contenant :
+    Loader PVSyst ultra-robuste pour fichiers du type :
     date;EOutInv
-     ;kW
-    puis série de valeurs horaires.
-    Retourne une série indexée en datetime (kW).
+        ;kW
+    01/01/90 00:00;-0,0035
+    ...
+    Retourne une série horaire en kW (index datetime), pas_h = 1.0
     """
     import pandas as pd
 
-    # Trouver la vraie ligne d'en-tête
-    header_line = None
-    with open(path, encoding="latin-1") as f:
-        for i, line in enumerate(f):
-            if line.lower().startswith("date;"):
-                header_line = i
-                break
-
-    if header_line is None:
+    # Lecture brute des lignes
+    try:
+        with open(path, encoding="latin-1") as f:
+            lines = f.read().splitlines()
+    except FileNotFoundError:
         return None, None
 
-    # Lecture avec l'en-tête détecté
-    df = pd.read_csv(path, sep=";", skiprows=header_line, encoding="latin-1", header=0)
+    # Trouve la ligne d'en-tête "date;..."
+    header_idx = None
+    for i, ln in enumerate(lines):
+        if ln.strip().lower().startswith("date;"):
+            header_idx = i
+            break
+    if header_idx is None:
+        return None, None
 
-    # Supprimer la ligne d'unités (celle qui contient kW)
-    df = df[~df.apply(lambda row: row.astype(str).str.contains("kW", case=False).any(), axis=1)]
+    # Construit les lignes utiles (ignore la ligne d'unités contenant 'kW')
+    rows = []
+    for ln in lines[header_idx+1:]:
+        if not ln.strip():
+            continue
+        parts = [p.strip() for p in ln.split(";")]
+        if len(parts) < 2:
+            continue
+        # ignore ligne d'unités
+        if any("kw" in p.lower() for p in parts):
+            continue
+        # garde seulement 2 colonnes: date ; valeur
+        rows.append(parts[:2])
 
-    # Convertir colonne date
-    df['date'] = pd.to_datetime(df['date'], dayfirst=True, errors='coerce')
+    if not rows:
+        return None, None
 
-    # Convertir puissance AC (valeurs séparateur virgule → point)
-    df['EOutInv'] = df['EOutInv'].astype(str).str.replace(",", ".", regex=False).astype(float)
+    df = pd.DataFrame(rows, columns=["date", "EOutInv"])
+    # Normalisation décimale et parsing
+    df["date"] = pd.to_datetime(df["date"], dayfirst=True, errors="coerce")
+    df["EOutInv"] = (
+        df["EOutInv"].astype(str).str.replace(",", ".", regex=False)
+    )
+    # Filtre les lignes vraiment numériques
+    df = df[df["EOutInv"].str.match(r"^-?\d+(\.\d+)?$", na=False)]
+    df["EOutInv"] = df["EOutInv"].astype(float)
 
-    # Série finale
-    s = df.set_index('date')['EOutInv'].dropna()
+    df = df.dropna(subset=["date"])
+    if df.empty:
+        return None, None
 
-    return s, 1.0  # pas horaire
+    s = df.set_index("date")["EOutInv"]
+    return s, 1.0
+
 
 
 def shape_from_template(template_kWh):
