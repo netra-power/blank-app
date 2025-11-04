@@ -866,8 +866,3 @@ if ("bâtiment" in system_type.lower()) and (marche_libre == "Oui"):
     ax.legend()
     st.pyplot(fig)
 
-st.caption(
-    "Remarques : Les prix ENTSO-E (Swissgrid) sont utilisés si la clé API est fournie. "
-    "Les fichiers CSV doivent contenir 8760 valeurs horaires (kWh/h) sans en-tête. "
-    "Charte : PV=#FFEE8C, BESS charge=#62A9C6, BESS décharge=#4B94B0, Conso=#B7D9B1, Import réseau=#F3C77A, Export réseau=#E2B007."
-)
